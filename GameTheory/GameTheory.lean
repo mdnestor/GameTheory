@@ -6,11 +6,92 @@ def Relation (X Y: Type): Type :=
 def Endorelation (X: Type): Type :=
   Relation X X
 
+instance Relation.le (X Y: Type): LE (Relation X Y) := {
+  le := fun R1 R2 => ∀ x y, R1 x y → R2 x y
+}
+
+instance (X: Type): LE (Endorelation X) :=
+  Relation.le X X
+
 def reflexive {X: Type} (R: Endorelation X): Prop :=
   ∀ x, R x x
 
 def antisymmetric {X: Type} (R: Endorelation X): Prop :=
   ∀ x y, R x y → R y x → x = y
+
+def irreflexive {X: Type} (R: Endorelation X): Prop :=
+  ∀ x, ¬ R x x
+
+-- Given an endorelation, we can make it strict.
+def strict {X: Type} (R: Endorelation X): Endorelation X :=
+  fun x1 x2 => R x1 x2 ∧ ¬ R x2 x1
+
+example {X: Type} {R: Endorelation X}: strict R ≤ R := by
+  exact fun _ _ h => h.left
+
+/-
+
+The fundamental concept is that of a preference profile:
+
+- a set A of agents,
+- a set O of outcomes,
+- each agent has a preference relation on O.
+
+Any preference profile has the corresponding 'Pareto preference'
+defined by o1 ≤ o2 if every agent prefers a2 to a1.
+Note this is really just the product relation.
+
+-/
+
+variable {A P X Y O: Type}
+
+def PreferenceProfile (A O: Type): Type :=
+  A → Endorelation O
+
+def Pareto (pref: PreferenceProfile A O): Endorelation O :=
+  fun o1 o2 => ∀ a, pref a o1 o2
+
+theorem strict_pareto_iff {pref: PreferenceProfile P O} (o1 o2: O): strict (Pareto pref) o1 o2 ↔ (∀ p, pref p o1 o2) ∧ (∃ p, ¬ pref p o2 o1) := by
+  simp [strict, Pareto]
+
+-- An outcome is Pareto efficient if it is not strictly Pareto dominated.
+
+def pareto_efficient (pref: PreferenceProfile P O) (o: O): Prop :=
+  ∀ o', ¬ strict (Pareto pref) o o'
+
+-- A preference profile is called 'zero-sum' if preferences are flipped between different players.
+
+def zero_sum (pref: PreferenceProfile P O): Prop :=
+  ∀ p1 p2 o1 o2, p1 ≠ p2 → (pref p1 o1 o2 ↔ pref p2 o2 o1)
+
+/-
+
+In a zero-sum game with at least 2 players and all preferences reflexive and anti-symmetric,
+every outcome is Pareto efficient.
+
+Proof:
+- Suppose for contradiction π is not Pareto efficient.
+- Then there exists strict Pareto improvement π'.
+- So any two distinct players p1, p2 weakly prefer π ≤ π'.
+- By zero sum, since p1 weakly prefers π ≤ π' then p2 weakly prefers π' ≤ π.
+- By reflexivity π = π'.
+- But since π' is a strict improvement, some player p3 strictly prefers π < π' = π, contradiction.
+
+-/
+
+theorem zero_sum_pareto_efficient {pref: PreferenceProfile P X} (h1: zero_sum pref) (h2: ∀ p, reflexive (pref p)) (h3: ∀ p, antisymmetric (pref p)) (h4: ∀ p: P, ∃ p': P, p ≠ p'): ∀ π, pareto_efficient pref π := by
+  intro π π' h_strict
+  simp_all [strict, Pareto]
+  obtain ⟨p1, h_p1_not_prefer_π⟩ := h_strict.2
+  obtain ⟨p2, h_p1_neq_p2⟩ := h4 p1
+  have h_p1_prefer_π' := h_strict.1 p1
+  have h_p2_prefer_π' := h_strict.1 p2
+  have h_p2_prefer_π := (h1 _ _ π π' h_p1_neq_p2).mp h_p1_prefer_π'
+  have π_eq_π' := h3 p2 _ _ h_p2_prefer_π' h_p2_prefer_π
+  rw [π_eq_π'] at h_p1_not_prefer_π
+  exact h_p1_not_prefer_π (h2 p1 π')
+
+
 
 /-
 
@@ -40,7 +121,7 @@ class UtilityGame (P S U: Type) where
 
 class OutcomeGame (P S O: Type) where
   play: (P → S) → O
-  prefer:  P → Endorelation O
+  prefer: PreferenceProfile P O
 
 variable {P S O U: Type} [DecidableEq P]
 
@@ -56,7 +137,7 @@ def UtilityGame.toOutcomeGame (G: UtilityGame P S U): OutcomeGame P S (P → U) 
 -- Instead, the players can have preferences directly on strategy profiles.
 
 class Game (P S: Type) where
-  prefer: P → Endorelation (P → S)
+  prefer: PreferenceProfile P (P → S)
 
 -- This is actually an equivalent representation because we can treat the strategy profiles themselves as outcomes.
 def OutcomeGame.toGame (G: OutcomeGame P S O): Game P S := {
@@ -196,8 +277,6 @@ example: nash_equilibrium PrisonerDilemma.toGame (fun _ => true) := by
 
 -- Given a preference, there is the associated "strict" preference, along with all the associated notions
 
-def strict {X: Type} (prefer: Endorelation X): Endorelation X :=
-  fun x1 x2 => prefer x1 x2 ∧ ¬ prefer x2 x1
 
 def strict_prefer_strategy (G: Game P S) (π: P → S) (p: P) (s0 s1: S): Prop :=
   strict (prefer_strategy G π p) s0 s1
@@ -239,85 +318,6 @@ theorem strict_dominant_unique [Nonempty S] {G: Game P S} {p: P} {s s': S} (h1: 
   have := h1 s' π
   have := h2 s π
   simp_all [strict_prefer_strategy, strict]
-
-
-
--- Given an indexed collection P_1, P_2, ..., P_n of individual preferences on X,
--- the Pareto preference is defined by x ≤ y iff. every individual prefers x ≤ y.
-
-def pareto {X I: Type} (prefer: I → Endorelation X): Endorelation X :=
-  fun x1 x2 => ∀ i, prefer i x1 x2
-
--- A profile π1 Pareto dominates π0 if every player prefers π1.
--- It is Pareto dominant if it Pareto dominates every other strategy.
--- Likewise for strict Pareto dominates.
-
-def pareto_dominates (G: Game P S) (π0 π1: P → S): Prop :=
-  pareto G.prefer π0 π1
-
-def pareto_dominant (G: Game P S) (π: P → S): Prop :=
-  ∀ π0, pareto_dominates G π0 π
-
-def strict_pareto_dominates (G: Game P S) (π0 π1: P → S): Prop :=
-  strict (pareto G.prefer) π0 π1
-
-def strict_pareto_dominant (G: Game P S) (π: P → S): Prop :=
-  ∀ π0, strict_pareto_dominates G π0 π
-
--- π1 strictly Pareto dominates π0 iff. everyone weakly prefer π1, and someone strongly prefers π1.
-
-theorem strict_pareto_dominates_iff (G: Game P S) (π0 π1: P → S): strict_pareto_dominates G π0 π1 ↔ (∀ p, G.prefer p π0 π1) ∧ (∃ p, ¬ G.prefer p π1 π0) := by
-  simp [strict_pareto_dominates]
-  constructor
-  · intro h
-    constructor
-    · exact h.1
-    · have := h.2
-      simp [pareto] at this
-      exact this
-  · intro h
-    constructor
-    · intro i
-      exact h.1 i
-    · simp [pareto]
-      exact h.2
-
--- A profile is Pareto efficient if it is not strictly Pareto dominated.
-
-def pareto_efficient (G: Game P S) (π: P → S): Prop :=
-  ∀ π1, ¬ strict_pareto_dominates G π π1
-
--- A zero-sum game is one where preferences are flipped between different players.
-
-def zero_sum (G: Game P S): Prop :=
-  ∀ p1 p2 π1 π2, p1 ≠ p2 → (G.prefer p1 π1 π2 ↔ G.prefer p2 π2 π1)
-
-/-
-
-In a zero-sum game with at least 2 players and all preferences reflexive and anti-symmetric,
-every strategy profile is Pareto efficient.
-
-Proof:
-- Suppose for contradiction π is not Pareto efficient.
-- Then there exists strict Pareto improvement π'.
-- So any two distinct players p1, p2 weakly prefer π ≤ π'.
-- By zero sum, since p1 weakly prefers π ≤ π' then p2 weakly prefers π' ≤ π.
-- By reflexivity π = π'.
-- But since π' is a strict improvement, some player p3 strictly prefers π < π' = π, contradiction.
-
--/
-
-theorem zero_sum_pareto_efficient (G: Game P S) (h1: zero_sum G) (h2: ∀ p, reflexive (G.prefer p)) (h3: ∀ p, antisymmetric (G.prefer p)) (h4: ∀ p: P, ∃ p': P, p ≠ p'): ∀ π: P → S, pareto_efficient G π := by
-  intro π π' h_strict
-  simp_all [strict_pareto_dominates, strict, pareto]
-  obtain ⟨p1, h_p1_not_prefer_π⟩ := h_strict.2
-  obtain ⟨p2, h_p1_neq_p2⟩ := h4 p1
-  have h_p1_prefer_π' := h_strict.1 p1
-  have h_p2_prefer_π' := h_strict.1 p2
-  have h_p2_prefer_π := (h1 _ _ π π' h_p1_neq_p2).mp h_p1_prefer_π'
-  have π_eq_π' := h3 p2 _ _ h_p2_prefer_π' h_p2_prefer_π
-  rw [π_eq_π'] at h_p1_not_prefer_π
-  exact h_p1_not_prefer_π (h2 p1 π')
 
 
 

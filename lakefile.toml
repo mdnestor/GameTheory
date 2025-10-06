@@ -2,6 +2,10 @@ name = "GameTheory"
 version = "0.1.0"
 defaultTargets = ["gametheory"]
 
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+
 [[lean_lib]]
 name = "GameTheory"
 
