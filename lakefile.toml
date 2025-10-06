@@ -1,0 +1,10 @@
+name = "GameTheory"
+version = "0.1.0"
+defaultTargets = ["gametheory"]
+
+[[lean_lib]]
+name = "GameTheory"
+
+[[lean_exe]]
+name = "gametheory"
+root = "Main"
