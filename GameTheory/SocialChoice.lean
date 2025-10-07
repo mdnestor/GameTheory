@@ -34,13 +34,13 @@ def IsPareto (F: (I → Endorelation X) → Endorelation X): Prop :=
 
 -- An agent is called decisive over outcomes o1, o2 if whenever he prefers o1 ≤ o2, so does the social ordering.
 
-def decisive (c: Rel.vote A O) (a: A) (o1 o2: O): Prop :=
-  ∀ p, (p a).rel o1 o2 → (c p).rel o1 o2
+-- def decisive (c: Rel.vote A O) (a: A) (o1 o2: O): Prop :=
+--   ∀ p, (p a).rel o1 o2 → (c p).rel o1 o2
 
 -- A social ordering is called liberal if every individual is decisive over some outcomes.
 
-def liberal (c: Rel.vote A O): Prop :=
-  ∀ a, ∃ o1 o2, decisive c a o1 o2
+-- def liberal (c: Rel.vote A O): Prop :=
+--   ∀ a, ∃ o1 o2, decisive c a o1 o2
 
 -- An agent is called a 'dictator' if he is decisive over every pair of outcomes.
 
@@ -112,176 +112,256 @@ lemma subset_totalClosure (r : α → α → Prop) :
   apply TransGen.single
   exact Or.inl h
 
+-- This should follow from the 'universal domain' principle that any set of individuals preferences
+-- has a corresponding preference profile.
 
-theorem exists_condorcet_relation {π: PreferenceProfile I X} (h1: ∀ i, Pref (π i)) (C: Set I) {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z): ∃ π': PreferenceProfile I X, (∀ i, Pref (π' i)) ∧ (∀ i, π i x z ↔ π' i x z) ∧ (∀ i ∈ C, π' i x y ∧ π' i y z) ∧ (∀ i ∉ C, π' i y x ∧ π' i y z):= by
+theorem exists_condorcet_relation
+  (C : Set I) {x y z : X}
+  (hxy : x ≠ y) (hxz : x ≠ z) (hyz : y ≠ z) :
+  ∀ π : PreferenceProfile I X, (∀ i, Pref (π i)) →
+  ∃ π' : PreferenceProfile I X,
+    (∀ i, Pref (π' i)) ∧
+    -- preserve the (x,z) comparisons (for IIA on (x,z))
+    (∀ i, π i x z ↔ π' i x z) ∧
+    -- coalition prefers x ≻ y ≻ z
+    (∀ i ∈ C, π' i x y ∧ π' i y z) ∧
+    -- outsiders prefer y ≻ x and y ≻ z
+    (∀ i ∉ C, π' i y x ∧ π' i y z) := sorry
+
+/-- Profile Existence (two-profile, IIA-ready).
+
+Given a coalition `C` and distinct `x y z`, there exist two profiles `π₁` and `π₂`
+(with valid individual preferences) that **agree on a chosen pair `(p,q)`** for every
+agent, while realizing the needed local constraints on `{x,y,z}`.
+
+Instantiations:
+- forward step: take `(p,q) = (x,z)` and use `π₁` below;
+- backward step: take `(p,q) = (z,y)` and use `π₂` below.
+-/
+theorem exists_profiles_agree_on_pair
+  (C : Set I) {x y z p q : X}
+  (hxy : x ≠ y) (hxz : x ≠ z) (hyz : y ≠ z) :
+  ∃ (π₁ π₂ : PreferenceProfile I X),
+    (∀ i, Pref (π₁ i) ∧ Pref (π₂ i)) ∧
+    -- they agree on (p,q) agentwise (the IIA precondition)
+    (∀ i, π₁ i p q ↔ π₂ i p q) ∧
+    -- π₁ realizes the "forward" constraints
+    (∀ i ∈ C,   π₁ i x y ∧ π₁ i y z) ∧
+    (∀ i ∉ C,   π₁ i y x ∧ π₁ i y z) ∧
+    -- π₂ realizes the "backward" constraints
+    (∀ i ∈ C,   π₂ i z x ∧ π₂ i x y) ∧
+    (∀ i ∉ C,   π₂ i z x ∧ π₂ i y x) := sorry
+
+
+-- theorem exists_condorcet_relation (C: Set I) {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z): ∀ π: PreferenceProfile I X, (∀ i, Pref (π i)) → ∃ π': PreferenceProfile I X, (∀ i, Pref (π' i)) ∧ (∀ i, π i x z ↔ π' i x z) ∧ (∀ i ∈ C, π' i x y ∧ π' i y z) ∧ (∀ i ∉ C, π' i y x ∧ π' i y z):= by
+--   sorry
+
+theorem exists_condorcet_relation_reverse (C: Set I) {x y z: X} (hzx: z ≠ x) (hzy: z ≠ y) (hxy: x ≠ y): ∀ π: PreferenceProfile I X, (∀ i, Pref (π i)) → ∃ π': PreferenceProfile I X, (∀ i, Pref (π' i)) ∧ (∀ i, π i z y ↔ π' i z y) ∧ (∀ i ∈ C, π' i z x ∧ π' i x y) ∧ (∀ i ∉ C, π' i z x ∧ π' i y x):= by
   sorry
 
-theorem decisive_spread_forward {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z) {F: PreferenceProfile I X → Endorelation X} (h2: ∀ π, (∀ i, Pref (π i)) → Pref (F π)) (h3: IsPareto F) (h4: iia F) {π: PreferenceProfile I X} (h5: ∀ i, Pref (π i)) {C: Set I} (h6: coalition_weak_decisive_over F π C x y): coalition_decisive_over F π C x z := by
-  intro h7
-  obtain ⟨π', h10, h11, h12, h13⟩ := exists_condorcet_relation h5 C hxy hxz hyz
-  have: F π x y := by
-    sorry
-  have: F π' x y := by
-    sorry
-  have: F π' y z := by
-    sorry
-  have: F π' x z := by
-    apply (h2 π' h10).trans
-    repeat assumption
-  rw [h4 π π' x z h11]
-  exact this
+-- theorem decisive_spread_forward
+--   {x y z : X}
+--   (hxy : x ≠ y) (hxz : x ≠ z) (hyz : y ≠ z)
+--   {F : PreferenceProfile I X → Endorelation X}
+--   (h2 : ∀ π, (∀ i, Pref (π i)) → Pref (F π))
+--   (h3 : IsPareto F)
+--   (h4 : iia F)
+--   {C : Set I}
+--   (h6 : ∀ π, coalition_weak_decisive_over F π C x y) :
+--   ∀ π, (∀ i, Pref (π i)) → coalition_decisive_over F π C x z := by
+--   intro π h7 h8
+--   obtain ⟨π₁, π₂, hpref, hagree, hC₁, hNC₁, hC₂, hNC₂⟩ :=
+--     exists_profiles_agree_on_pair C hxy hxz hyz
+--   -- IIA lets us replace F π with F π₁ since they agree on (x,z)
+--   rw [h4 π π₁ x z (hagree)]
+--   -- Transitivity of the social ordering:
+--   apply (h2 π₁ (fun i => (hpref i).1)).trans _ y _
+--   · -- first goal: F π₁ x y (coalition’s weak decisiveness)
+--     apply h6 π₁
+--     constructor
+--     · intro i hi; exact (hC₁ i hi).1
+--     · intro i hi; exact (hNC₁ i hi).1
+--   · -- second goal: F π₁ y z (Pareto)
+--     apply h3
+--     intro i
+--     by_cases hi : i ∈ C
+--     · exact (hC₁ i hi).2
+--     · exact (hNC₁ i hi).2
 
-theorem decisive_spread_backward {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z) {F: PreferenceProfile I X → Endorelation X} (h2: ∀ π, (∀ i, Pref (π i)) → Pref (F π)) (h3: IsPareto F) (h4: iia F) {π: PreferenceProfile I X} (h5: ∀ i, Pref (π i)) {C: Set I} (h6: coalition_weak_decisive_over F π C x y): coalition_decisive_over F π C z y := by
-  sorry
+theorem decisive_spread_backward {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z) {F: PreferenceProfile I X → Endorelation X} (h2: ∀ π, (∀ i, Pref (π i)) → Pref (F π)) (h3: IsPareto F) (h4: iia F) {C: Set I} (h6: ∀ π, coalition_weak_decisive_over F π C x y): ∀ π, (∀ i, Pref (π i)) → coalition_decisive_over F π C z y := by
+  intro π h7 h8
+  have hzx: z ≠ x := by exact id (Ne.symm hxz)
+  have hzy: z ≠ y := by exact id (Ne.symm hyz)
+  obtain ⟨π', h10, h11, h12, h13⟩ := exists_condorcet_relation_reverse C hzx hzy hxy π h7
+  rw [h4 π π' z y h11]
+  apply (h2 π' h10).trans _ x _
+  apply h3
+  intro i
+  by_cases hi: i ∈ C
+  · exact (h12 i hi).1
+  · exact (h13 i hi).1
+  apply h6 π'
+  constructor
+  · intro i hi
+    exact (h12 i hi).2
+  · intro i hi
+    exact (h13 i hi).2
 
-theorem decisive_symmetry {x y: X} (hxy: x ≠ y) (hz: ∃ z, x ≠ z ∧ y ≠ z) {F: PreferenceProfile I X → Endorelation X} (h2: ∀ π, (∀ i, Pref (π i)) → Pref (F π)) (h3: IsPareto F) (h4: iia F) {π: PreferenceProfile I X} (h5: ∀ i, Pref (π i)) {C: Set I} (h6: coalition_weak_decisive_over F π C x y): coalition_decisive_over F π C y x := by
-  sorry
+-- theorem decisive_symmetry {x y: X} (hxy: x ≠ y) (hz: ∃ z, x ≠ z ∧ y ≠ z) {F: PreferenceProfile I X → Endorelation X} (h2: ∀ π, (∀ i, Pref (π i)) → Pref (F π)) (h3: IsPareto F) (h4: iia F) {C: Set I} (h6: ∀ π, coalition_weak_decisive_over F π C x y): ∀ π, coalition_decisive_over F π C y x := by
+--   intro π
+--   obtain ⟨z, hxz, hyz⟩ := hz
+--   have := decisive_spread_forward hxy hxz hyz h2 h3 h4 h6 π
+--   have : coalition_weak_decisive_over F π C x z := by exact?
+
+--   have := coalition_weak_decisive_over_decisive_over this
+--   have := decisive_spread_backward hxz hxy (id (Ne.symm hyz)) h2 h3 h4 h5 this
+--   have := coalition_weak_decisive_over_decisive_over this
+--   have := decisive_spread_forward hyz (id (Ne.symm hxy)) (id (Ne.symm hxz)) h2 h3 h4 h5 this
+
+-- theorem decisive_coalition_contraction [Fintype A] [DecidableEq O] [∀ C: Set A, ∀ a, Decidable (a ∈ C)]
+--   {c: (A → StrictPrefs O) → StrictPrefs O} {C: Set A} (h1: coalition_decisive2 c C) (h2: 2 ≤ Fintype.card C) (h3: ∀ p, Total (c p).val) (hc4: ∀ p, Transitive (c p).val) (hc5: ∀ p: PreferenceProfile A O, ∀ a, Transitive (p a)): ∃ C' < C, coalition_decisive2 c C' := by
+--   have: ∃ C1 C2: Set A, Nonempty C1 ∧ Nonempty C2 ∧ Disjoint C1 C2 ∧ C1 ∪ C2 = C := by sorry
+--   obtain ⟨C1, C2, h3, h4, h5, h6⟩ := this
+--   let x: O := sorry
+--   let y: O := sorry
+--   let z: O := sorry
+--   have: x ≠ y := sorry
+--   have: x ≠ z := sorry
+--   have: y ≠ z := sorry
+--   have: Nonempty (A → StrictPrefs O) := by
+--     sorry
+
+--   let p: A → StrictPrefs O := Classical.ofNonempty
+
+--   let p': A → Endorelation O := fun a => fun o1 o2 =>
+--     if a ∈ C1 then
+--       (if (o1 = z ∧ o2 = y) ∨ (o1 = y ∧ o2 = x) then True else (p a).val o1 o2)
+--     else if a ∈ C2 then
+--       (if (o1 = y ∧ o2 = x) ∨  (o1 = x ∧ o2 = z) then True else (p a).val o1 o2)
+--     else
+--       (if (o1 = x ∧ o2 = z) ∨ (o1 = z ∧ o2 = y) then True else (p a).val o1 o2)
+--   have: ∀ a, StrictPref (p' a) := by
+--     intro a
+--     have:= (p a).prop.total
+--     have:= (p a).prop.trans
+--     constructor
+--     intro o
+--     aesop
+--     simp [Total]
+--     intro o1 o2
+--     --by_cases a ∈ C1 <;> by_cases a ∈ C2 <;> by_cases (o1 = z ∧ o2 = y) <;> by_cases (o1 = y ∧ o2 = x) <;> by_cases (o1 = x ∧ o2 = z)
+
+--     --by_cases o1 = x <;> by_cases o1 = y <;> by_cases o1 = z
+--     repeat simp_all [p, p']
 
 
-theorem decisive_coalition_contraction [Fintype A] [DecidableEq O] [∀ C: Set A, ∀ a, Decidable (a ∈ C)]
-  {c: (A → StrictPrefs O) → StrictPrefs O} {C: Set A} (h1: coalition_decisive2 c C) (h2: 2 ≤ Fintype.card C) (h3: ∀ p, Total (c p).val) (hc4: ∀ p, Transitive (c p).val) (hc5: ∀ p: PreferenceProfile A O, ∀ a, Transitive (p a)): ∃ C' < C, coalition_decisive2 c C' := by
-  have: ∃ C1 C2: Set A, Nonempty C1 ∧ Nonempty C2 ∧ Disjoint C1 C2 ∧ C1 ∪ C2 = C := by sorry
-  obtain ⟨C1, C2, h3, h4, h5, h6⟩ := this
-  let x: O := sorry
-  let y: O := sorry
-  let z: O := sorry
-  have: x ≠ y := sorry
-  have: x ≠ z := sorry
-  have: y ≠ z := sorry
-  have: Nonempty (A → StrictPrefs O) := by
-    sorry
-
-  let p: A → StrictPrefs O := Classical.ofNonempty
-
-  let p': A → Endorelation O := fun a => fun o1 o2 =>
-    if a ∈ C1 then
-      (if (o1 = z ∧ o2 = y) ∨ (o1 = y ∧ o2 = x) then True else (p a).val o1 o2)
-    else if a ∈ C2 then
-      (if (o1 = y ∧ o2 = x) ∨  (o1 = x ∧ o2 = z) then True else (p a).val o1 o2)
-    else
-      (if (o1 = x ∧ o2 = z) ∨ (o1 = z ∧ o2 = y) then True else (p a).val o1 o2)
-  have: ∀ a, StrictPref (p' a) := by
-    intro a
-    have:= (p a).prop.total
-    have:= (p a).prop.trans
-    constructor
-    intro o
-    aesop
-    simp [Total]
-    intro o1 o2
-    --by_cases a ∈ C1 <;> by_cases a ∈ C2 <;> by_cases (o1 = z ∧ o2 = y) <;> by_cases (o1 = y ∧ o2 = x) <;> by_cases (o1 = x ∧ o2 = z)
-
-    --by_cases o1 = x <;> by_cases o1 = y <;> by_cases o1 = z
-    repeat simp_all [p, p']
+--     --aesop
 
 
-    --aesop
+--   --have: ∀ a ∈ C, p a z x := by aesop
+--   have: ∀ a ∈ C, (p' a) y x := by
+--     intro a a_1
+--     subst h6
+--     simp_all only [nonempty_subtype, ne_eq, nonempty_fun, ite_self, implies_true, Fintype.card_ofFinset,
+--       Set.mem_union, x, y, z, p', p]
+
+--   have := h1 z x p
+--   by_cases h7: (c p).val z x
+--   have: coalition_weak_decisive_over2 c C1 z x := by
+--     intro p''
+--     intro ⟨h8, h9⟩
+
+--     have: ∀ a, (p'' a).val z x = p' a z x := by
+--       intro a
+--       simp_all
+--       by_cases h10: a ∈ C1
+--       aesop
+--       by_cases h10: a ∈ C2
 
 
-  --have: ∀ a ∈ C, p a z x := by aesop
-  have: ∀ a ∈ C, (p' a) y x := by
-    intro a a_1
-    subst h6
-    simp_all only [nonempty_subtype, ne_eq, nonempty_fun, ite_self, implies_true, Fintype.card_ofFinset,
-      Set.mem_union, x, y, z, p', p]
+--   sorry
 
-  have := h1 z x p
-  by_cases h7: (c p).val z x
-  have: coalition_weak_decisive_over2 c C1 z x := by
-    intro p''
-    intro ⟨h8, h9⟩
+-- def exists_coalition_of_size [Fintype A] [∀ C: Set A, ∀ a, Decidable (a ∈ C)] (c: SocialOrdering A O) (n: Nat): Prop :=
+--   ∃ C, coalition_decisive c C ∧ Fintype.card C = n
 
-    have: ∀ a, (p'' a).val z x = p' a z x := by
-      intro a
-      simp_all
-      by_cases h10: a ∈ C1
-      aesop
-      by_cases h10: a ∈ C2
+-- theorem pareto_univ_decisive {c: SocialOrdering A O} (h: IsPareto c): coalition_decisive c Set.univ := by
+--   simp [coalition_decisive, coalition_decisive_over]
+--   exact fun o1 o2 p => h p o1 o2
 
+-- theorem exists_minimal_decisive_coalition [Fintype A] [∀ C: Set A, ∀ a, Decidable (a ∈ C)] {c: SocialOrdering A O} (hc: IsPareto c): ∃ n, Minimal (exists_coalition_of_size c) n := by
+--    apply exists_minimal_of_wellFoundedLT
+--    exists Fintype.card A
+--    exists Set.univ
+--    constructor
+--    exact pareto_univ_decisive hc
+--    exact Fintype.card_setUniv
 
-  sorry
+-- -- Cannot have an empty decisive coalition
+-- theorem decisive_coalition_nonempty [Fintype A] [∀ C: Set A, ∀ a, Decidable (a ∈ C)] {c: SocialOrdering A O} (hc: IsPareto c) {C: Set A} (h1: coalition_decisive c C): C.Nonempty := by
+--   sorry
 
-def exists_coalition_of_size [Fintype A] [∀ C: Set A, ∀ a, Decidable (a ∈ C)] (c: SocialOrdering A O) (n: Nat): Prop :=
-  ∃ C, coalition_decisive c C ∧ Fintype.card C = n
+-- theorem decisive_coalition_minimal [Fintype A] [∀ C: Set A, ∀ a, Decidable (a ∈ C)] {c: SocialOrdering A O} (hc: IsPareto c): Minimal (exists_coalition_of_size c) 1 := by
+--   obtain ⟨n, hn⟩ := exists_minimal_decisive_coalition hc
+--   obtain ⟨C, hC1, hC2⟩ := hn.1
+--   have n_neq_zero: n ≠ 0 := by
+--     intro
+--     simp_all
+--     have := Set.subset_eq_empty hC2 rfl
+--     have := decisive_coalition_nonempty hc hC1
+--     simp_all
+--   have n_lt_two: n < 2 := by
+--     apply Classical.not_not.mp
+--     intro h
+--     simp at h
+--     rw [←hC2] at h
+--     obtain ⟨C', hC3, _⟩ := decisive_coalition_contraction hC1 h
+--     have hC4 := Set.card_lt_card hC3
+--     have := Minimal.le_of_le hn (by exists C')
+--     have := Nat.le_of_succ_le (Nat.lt_of_lt_of_eq hC4 hC2)
+--     simp_all [Nat.not_le_of_gt]
+--   have: n = 1 := by
+--     apply Nat.le_antisymm
+--     exact Nat.le_of_lt_succ n_lt_two
+--     exact Nat.one_le_iff_ne_zero.mpr n_neq_zero
+--   rw [←this]
+--   exact hn
 
-theorem pareto_univ_decisive {c: SocialOrdering A O} (h: IsPareto c): coalition_decisive c Set.univ := by
-  simp [coalition_decisive, coalition_decisive_over]
-  exact fun o1 o2 p => h p o1 o2
+-- theorem exists_dictatorship [Fintype A] [∀ C: Set A, ∀ a, Decidable (a ∈ C)] {c: SocialOrdering A O} (hc: IsPareto c) {C: Set A} (h1: coalition_decisive c C) (h2: 2 ≤ Fintype.card C): dictatorship c := by
+--   have := decisive_coalition_minimal hc
+--   obtain ⟨x, hx⟩ := this
+--   obtain ⟨C, hC1, hC2⟩ := x
+--   have: Nonempty C := by
+--     apply Fintype.card_pos_iff.mp
+--     exact Nat.lt_of_sub_eq_succ hC2
+--   have x: C := Classical.ofNonempty
+--   have: C = (Set.singleton x.val) := by sorry -- should follow quickly from `hC2 : Fintype.card ↑C = 1`
+--   rw [this] at hC1
+--   exists x
+--   intro o1 o2 p h
+--   apply hC1 o1 o2 p
+--   intro a ha
+--   rw [ha]
+--   exact h
 
-theorem exists_minimal_decisive_coalition [Fintype A] [∀ C: Set A, ∀ a, Decidable (a ∈ C)] {c: SocialOrdering A O} (hc: IsPareto c): ∃ n, Minimal (exists_coalition_of_size c) n := by
-   apply exists_minimal_of_wellFoundedLT
-   exists Fintype.card A
-   exists Set.univ
-   constructor
-   exact pareto_univ_decisive hc
-   exact Fintype.card_setUniv
+-- -- also requires that |A| ≥ 3
+-- theorem arrow {c: SocialOrdering A O} (h1: IsPareto c) (h2: ¬ dictatorship c) (h3: iia c): False :=
+--   sorry
 
--- Cannot have an empty decisive coalition
-theorem decisive_coalition_nonempty [Fintype A] [∀ C: Set A, ∀ a, Decidable (a ∈ C)] {c: SocialOrdering A O} (hc: IsPareto c) {C: Set A} (h1: coalition_decisive c C): C.Nonempty := by
-  sorry
+-- -- A social choice function maps preference profiles to outcome sets.
+-- -- It can still be interpreted as a social ordering, where o1 ≤ o2 in the social ordering whenever o1 ∈ S → o2 ∈ S where S is the chosen outcome set.
 
-theorem decisive_coalition_minimal [Fintype A] [∀ C: Set A, ∀ a, Decidable (a ∈ C)] {c: SocialOrdering A O} (hc: IsPareto c): Minimal (exists_coalition_of_size c) 1 := by
-  obtain ⟨n, hn⟩ := exists_minimal_decisive_coalition hc
-  obtain ⟨C, hC1, hC2⟩ := hn.1
-  have n_neq_zero: n ≠ 0 := by
-    intro
-    simp_all
-    have := Set.subset_eq_empty hC2 rfl
-    have := decisive_coalition_nonempty hc hC1
-    simp_all
-  have n_lt_two: n < 2 := by
-    apply Classical.not_not.mp
-    intro h
-    simp at h
-    rw [←hC2] at h
-    obtain ⟨C', hC3, _⟩ := decisive_coalition_contraction hC1 h
-    have hC4 := Set.card_lt_card hC3
-    have := Minimal.le_of_le hn (by exists C')
-    have := Nat.le_of_succ_le (Nat.lt_of_lt_of_eq hC4 hC2)
-    simp_all [Nat.not_le_of_gt]
-  have: n = 1 := by
-    apply Nat.le_antisymm
-    exact Nat.le_of_lt_succ n_lt_two
-    exact Nat.one_le_iff_ne_zero.mpr n_neq_zero
-  rw [←this]
-  exact hn
+-- def SocialChoice (A O: Type): Type :=
+--   PreferenceProfile A O → Set O
 
-theorem exists_dictatorship [Fintype A] [∀ C: Set A, ∀ a, Decidable (a ∈ C)] {c: SocialOrdering A O} (hc: IsPareto c) {C: Set A} (h1: coalition_decisive c C) (h2: 2 ≤ Fintype.card C): dictatorship c := by
-  have := decisive_coalition_minimal hc
-  obtain ⟨x, hx⟩ := this
-  obtain ⟨C, hC1, hC2⟩ := x
-  have: Nonempty C := by
-    apply Fintype.card_pos_iff.mp
-    exact Nat.lt_of_sub_eq_succ hC2
-  have x: C := Classical.ofNonempty
-  have: C = (Set.singleton x.val) := by sorry -- should follow quickly from `hC2 : Fintype.card ↑C = 1`
-  rw [this] at hC1
-  exists x
-  intro o1 o2 p h
-  apply hC1 o1 o2 p
-  intro a ha
-  rw [ha]
-  exact h
+-- def SocialChoice.toSocialOrdering {A O: Type} (c: SocialChoice A O): SocialOrdering A O :=
+--   fun p => fun o1 o2 => c p o1 → c p o2
 
--- also requires that |A| ≥ 3
-theorem arrow {c: SocialOrdering A O} (h1: IsPareto c) (h2: ¬ dictatorship c) (h3: iia c): False :=
-  sorry
+-- -- If a social choice function is strictly Pareto, and everyone strictly prefers o1 < o2, then o1 ∉ S.
 
--- A social choice function maps preference profiles to outcome sets.
--- It can still be interpreted as a social ordering, where o1 ≤ o2 in the social ordering whenever o1 ∈ S → o2 ∈ S where S is the chosen outcome set.
-
-def SocialChoice (A O: Type): Type :=
-  PreferenceProfile A O → Set O
-
-def SocialChoice.toSocialOrdering {A O: Type} (c: SocialChoice A O): SocialOrdering A O :=
-  fun p => fun o1 o2 => c p o1 → c p o2
-
--- If a social choice function is strictly Pareto, and everyone strictly prefers o1 < o2, then o1 ∉ S.
-
-theorem social_choice_strict_pareto [Nonempty A] {c: SocialChoice A O} (h1: IsStrictPareto c.toSocialOrdering)
-  (p: PreferenceProfile A O) (o1 o2: O) (h2: ∀ a, strict (p a) o1 o2): o1 ∉ c p := by
-  intro
-  have h3 := h1 p o1 o2
-  simp_all [strict, SocialChoice.toSocialOrdering]
-  have := h3.right.right
-  contradiction
+-- theorem social_choice_strict_pareto [Nonempty A] {c: SocialChoice A O} (h1: IsStrictPareto c.toSocialOrdering)
+--   (p: PreferenceProfile A O) (o1 o2: O) (h2: ∀ a, strict (p a) o1 o2): o1 ∉ c p := by
+--   intro
+--   have h3 := h1 p o1 o2
+--   simp_all [strict, SocialChoice.toSocialOrdering]
+--   have := h3.right.right
+--   contradiction
