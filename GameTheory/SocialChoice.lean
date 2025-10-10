@@ -98,34 +98,35 @@ theorem decisive_spread_backward {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: 
     · intro i hi
       exact (h4 i hi).right
 
-theorem decisive_spread_symmetric {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z) {F: (I → Prefs X) → Prefs X} (hF: pareto F) (hF2: iia F) {C: Set I} (h: coalition_weak_decisive_over F C x y): coalition_decisive_over F C y x := by
+theorem decisive_spread_symmetric (h0: ∀ x y: X, ∃ z, x ≠ z ∧ y ≠ z) {x y: X} (hxy: x ≠ y) {F: (I → Prefs X) → Prefs X} (hF: pareto F) (hF2: iia F) {C: Set I} (h: coalition_weak_decisive_over F C x y): coalition_decisive_over F C y x := by
+  obtain ⟨z, hxz, hyz⟩ := h0 x y
   have: coalition_decisive_over F C x z := by exact decisive_spread_forward hxy hxz hyz hF hF2 h
   have: coalition_weak_decisive_over F C x z := by exact coalition_decisive_over_weak_decisive_over this
   have: coalition_decisive_over F C y z := by exact decisive_spread_backward hxz hxy (id (Ne.symm hyz)) hF hF2 this
   have: coalition_weak_decisive_over F C y z := by exact coalition_decisive_over_weak_decisive_over this
   exact decisive_spread_forward hyz (id (Ne.symm hxy)) (id (Ne.symm hxz)) hF hF2 this
 
-theorem decisive_spread_strengthen {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z) {F: (I → Prefs X) → Prefs X} (hF: pareto F) (hF2: iia F) {C: Set I} (h: coalition_weak_decisive_over F C x y): coalition_decisive_over F C x y := by
-  have: coalition_decisive_over F C y x := by exact decisive_spread_symmetric hxy hxz hyz hF hF2 h
+theorem decisive_spread_strengthen (h0: ∀ x y: X, ∃ z, x ≠ z ∧ y ≠ z) {x y: X} (hxy: x ≠ y) {F: (I → Prefs X) → Prefs X} (hF: pareto F) (hF2: iia F) {C: Set I} (h: coalition_weak_decisive_over F C x y): coalition_decisive_over F C x y := by
+  have: coalition_decisive_over F C y x := by exact decisive_spread_symmetric h0 hxy hF hF2 h
   have: coalition_weak_decisive_over F C y x := by exact coalition_decisive_over_weak_decisive_over this
-  exact decisive_spread_symmetric (id (Ne.symm hxy)) hyz hxz hF hF2 this
+  exact decisive_spread_symmetric h0 (id (Ne.symm hxy)) hF hF2 this
 
-theorem decisive_spread {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z) {F: (I → Prefs X) → Prefs X} (hF: pareto F) (hF2: iia F) {C: Set I} (h: coalition_weak_decisive_over F C x y): coalition_decisive F C := by
+theorem decisive_spread (h0: ∀ x y: X, ∃ z, x ≠ z ∧ y ≠ z) {x y: X} (hxy: x ≠ y) {F: (I → Prefs X) → Prefs X} (hF: pareto F) (hF2: iia F) {C: Set I} (h: coalition_weak_decisive_over F C x y): coalition_decisive F C := by
   intro s t
   by_cases h1: s = t
   subst h1
   exact coalition_decisive_over_refl F C s
   by_cases h2: x = s <;> by_cases h3: x = t <;> by_cases h4: y = s <;> by_cases h5: y = t <;> simp_all
-  exact decisive_spread_strengthen h1 hxz hyz hF hF2 h
+  exact decisive_spread_strengthen h0 h1 hF hF2 h
   exact decisive_spread_forward hxy h1 h5 hF hF2 h
   subst h3 h4
-  exact decisive_spread_symmetric hxy hxz hyz hF hF2 h
+  exact decisive_spread_symmetric h0 hxy hF hF2 h
   subst h3
-  have := by exact decisive_spread_symmetric hxy hxz hyz hF hF2 h
+  have := by exact decisive_spread_symmetric h0 hxy hF hF2 h
   have := by exact coalition_decisive_over_weak_decisive_over this
   exact decisive_spread_backward h5 h4 h2 hF hF2 this
   subst h4
-  have := by exact decisive_spread_symmetric h2 hxz hyz hF hF2 h
+  have := by exact decisive_spread_symmetric h0 h2 hF hF2 h
   have := by exact coalition_decisive_over_weak_decisive_over this
   exact decisive_spread_forward (fun a => h2 (id (Eq.symm a))) h1 h3 hF hF2 this
   exact decisive_spread_backward h3 h2 h4 hF hF2 h
@@ -133,48 +134,87 @@ theorem decisive_spread {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z) 
   have := by exact coalition_decisive_over_weak_decisive_over this
   exact decisive_spread_backward h3 h2 (fun a => h1 (id (Eq.symm a))) hF hF2 this
 
-def exists_coalition_of_size [Fintype I] [∀ C: Set I, ∀ i, Decidable (i ∈ C)] (F: (I → Prefs X) → Prefs X) (n: Nat): Prop :=
-  ∃ C, coalition_decisive F C ∧ Fintype.card C = n
+def exists_nonempty_coalition_of_size [Fintype I] [∀ C: Set I, ∀ i, Decidable (i ∈ C)] (F: (I → Prefs X) → Prefs X) (n: Nat): Prop :=
+  ∃ C, C.Nonempty ∧ coalition_decisive F C ∧ Fintype.card C = n
 
 theorem pareto_univ_decisive {F: (I → Prefs X) → Prefs X} (h: pareto F): coalition_decisive F Set.univ := by
   simp [coalition_decisive, coalition_decisive_over]
   exact fun o1 o2 p => h p o1 o2
 
-theorem exists_minimal_decisive_coalition [Fintype I] [∀ C: Set I, ∀ i, Decidable (i ∈ C)] {F: (I → Prefs X) → Prefs X} (h: pareto F): ∃ n, Minimal (exists_coalition_of_size F) n := by
+theorem exists_minimal_decisive_coalition [Nonempty I] [Fintype I] [∀ C: Set I, ∀ i, Decidable (i ∈ C)] {F: (I → Prefs X) → Prefs X} (h: pareto F): ∃ n, Minimal (exists_nonempty_coalition_of_size F) n := by
    apply exists_minimal_of_wellFoundedLT
    exists Fintype.card I
    exists Set.univ
-   constructor
+   repeat' (apply And.intro)
+   exact Set.nonempty_iff_univ_nonempty.mp (by assumption)
    exact pareto_univ_decisive h
    exact Fintype.card_setUniv
 
 -- Cannot have an empty decisive coalition
-theorem decisive_coalition_nonempty [Fintype I] [∀ C: Set I, ∀ i, Decidable (i ∈ C)] {F: (I → Prefs X) → Prefs X} (h: pareto F) {C: Set I} (h1: coalition_decisive F C): C.Nonempty := by
+-- This actually isn't needed because group contraction only splits into nontmpy...
+theorem decisive_coalition_nonempty [Fintype I] [∀ C: Set I, ∀ i, Decidable (i ∈ C)] {F: (I → Prefs X) → Prefs X} (h1: pareto F) {C: Set I} (h2: coalition_decisive F C): Nonempty C := by
   simp_all [coalition_decisive, coalition_decisive_over]
+
+
   sorry
 
-theorem decisive_coalition_contraction [Fintype I] [∀ C: Set I, ∀ i, Decidable (i ∈ C)] {F: (I → Prefs X) → Prefs X} {C: Set I} (h1: coalition_decisive F C) (h2: 2 ≤ Fintype.card C): ∃ C', C' < C ∧ coalition_decisive F C' := by
-  sorry
+theorem decisive_coalition_contraction [Fintype I] [∀ C: Set I, ∀ i, Decidable (i ∈ C)] (h0: ∀ (x y : X), ∃ z, x ≠ z ∧ y ≠ z) {F: (I → Prefs X) → Prefs X} {C: Set I} (h1: coalition_decisive F C) (h2: 2 ≤ Fintype.card C) (hF2: pareto F) (hF3: iia F): ∃ C', C' < C ∧ coalition_decisive F C' := by
+  -- C has at least 2 elements, so there exists nonempty partition
+  have: ∃ C1: Set I, Nonempty C1 ∧ C1 < C := sorry
+  obtain ⟨C1, hC1⟩ := this
+  let C2 := C1.compl
+  have hC2: Nonempty C2 := sorry -- obvious
+  have: ∃ x y z: X, x ≠ y ∧ x ≠ z ∧ y ≠ z := sorry
+  obtain ⟨x, y, z, hxy, hxz, hyz⟩ := this
+  have: ∃ π: I → Prefs X, (∀ i ∈ C1, π i x y ∧ π i y z) ∧ (∀ i ∈ C2, π i z x ∧ π i x y) ∧ (∀ i ∉ C, π i y z ∧ π i z x) := sorry
+  obtain ⟨π, h3, h4, h5⟩ := this
+  have: F π x y := by
+    apply h1
+    intro i hi
+    by_cases hi1: i ∈ C1
+    exact (h3 i hi1).left
+    exact (h4 i hi1).right
+  have := (F π).property.total x y
+  match this with
+  | Or.inl h6 => {
+    exists C1
+    constructor
+    simp_all only [Fintype.card_ofFinset, nonempty_subtype, Set.lt_eq_ssubset, ne_eq, true_or, C2]
+    apply decisive_spread h0 hxz hF2 hF3
+    intro π ⟨h7, h8⟩
+    sorry
+  }
+  | Or.inr h6 => {
+    exists C2
+    constructor
+    sorry
+    have hzy: z ≠ y := by exact id (Ne.symm hyz)
+    apply decisive_spread h0 hzy hF2 hF3
+    intro π ⟨h7, h8⟩
+    sorry
+  }
 
-theorem decisive_coalition_minimal [Fintype I] [∀ C: Set I, ∀ i, Decidable (i ∈ C)] {F: (I → Prefs X) → Prefs X} (h: pareto F): Minimal (exists_coalition_of_size F) 1 := by
-  obtain ⟨n, hn⟩ := exists_minimal_decisive_coalition h
-  obtain ⟨C, hC1, hC2⟩ := hn.1
+
+theorem decisive_coalition_minimal [Nonempty I] [Fintype I] [∀ C: Set I, ∀ i, Decidable (i ∈ C)] (h0: ∀ (x y : X), ∃ z, x ≠ z ∧ y ≠ z) {F: (I → Prefs X) → Prefs X} (hF2: pareto F) (hF3: iia F): Minimal (exists_nonempty_coalition_of_size F) 1 := by
+  obtain ⟨n, hn⟩ := exists_minimal_decisive_coalition hF2
+  obtain ⟨C, hC0, hC1, hC2⟩ := hn.1
   have n_neq_zero: n ≠ 0 := by
     intro
     simp_all
     have := Set.subset_eq_empty hC2 rfl
-    have := decisive_coalition_nonempty h hC1
+    have := decisive_coalition_nonempty hF2 hC1
     simp_all
   have n_lt_two: n < 2 := by
     apply Classical.not_not.mp
     intro h
     simp at h
     rw [←hC2] at h
-    obtain ⟨C', hC3, _⟩ := decisive_coalition_contraction hC1 h
+    obtain ⟨C', hC3, _⟩ := decisive_coalition_contraction h0 hC1 h hF2 hF3
     have hC4 := Set.card_lt_card hC3
-    have := Minimal.le_of_le hn (by exists C')
-    have := Nat.le_of_succ_le (Nat.lt_of_lt_of_eq hC4 hC2)
-    simp_all [Nat.not_le_of_gt]
+    sorry
+    -- have := Minimal.le_of_le hn (by exists C')
+    -- have := Nat.le_of_succ_le (Nat.lt_of_lt_of_eq hC4 hC2)
+    -- simp_all [Nat.not_le_of_gt]
   have: n = 1 := by
     apply Nat.le_antisymm
     exact Nat.le_of_lt_succ n_lt_two
@@ -182,13 +222,13 @@ theorem decisive_coalition_minimal [Fintype I] [∀ C: Set I, ∀ i, Decidable (
   rw [←this]
   exact hn
 
-theorem exists_dictatorship [Fintype I] [∀ C: Set I, ∀ i, Decidable (i ∈ C)] {F: (I → Prefs X) → Prefs X} (h1: pareto F) {C: Set I} (h2: 2 ≤ Fintype.card C) (h3: coalition_decisive F C): dictatorship F := by
-  have := decisive_coalition_minimal h1
+theorem exists_dictatorship [Nonempty I] [Fintype I] (h0: ∀ (x y : X), ∃ z, x ≠ z ∧ y ≠ z) [∀ C: Set I, ∀ i, Decidable (i ∈ C)] {F: (I → Prefs X) → Prefs X} (h1: pareto F) (h2: iia F) {C: Set I} (h3: 2 ≤ Fintype.card C) (h4: coalition_decisive F C): dictatorship F := by
+  have := decisive_coalition_minimal h0 h1 h2
   obtain ⟨x, hx⟩ := this
-  obtain ⟨C, hC1, hC2⟩ := x
+  obtain ⟨C, hC0, hC1, hC2⟩ := x
   have: Nonempty C := by
     apply Fintype.card_pos_iff.mp
-    exact Nat.lt_of_sub_eq_succ hC2
+    simp_all [Fintype.card_ofFinset, Nat.lt_add_one]
   have x: C := Classical.ofNonempty
   have: C = (Set.singleton x.val) := by sorry -- should follow quickly from `hC2 : Fintype.card ↑C = 1`
   rw [this] at hC1
@@ -211,12 +251,13 @@ theorem singleton_pareto_dictatorship [Subsingleton I] [Nonempty I] {F: (I → P
    exists Classical.ofNonempty
    apply singleton_pareto_dictator h
 
-theorem arrow [Fintype I] [Nonempty I] [∀ C: Set I, ∀ i, Decidable (i ∈ C)] (F: (I → Prefs X) → Prefs X) (h1: pareto F) (h2: iia F): dictatorship F := by
+theorem arrow (h0: ∀ (x y : X), ∃ z, x ≠ z ∧ y ≠ z) [Fintype I] [Nonempty I] [∀ C: Set I, ∀ i, Decidable (i ∈ C)] (F: (I → Prefs X) → Prefs X) (h1: pareto F) (h2: iia F): dictatorship F := by
    by_cases h: Fintype.card I ≤ 1
    have := Fintype.card_le_one_iff_subsingleton.mp h
    exact singleton_pareto_dictatorship h1
    simp [not_le] at h
    have: 2 ≤ Fintype.card (@Set.univ I) := by sorry
-   apply exists_dictatorship h1 (C := Set.univ)
+   apply exists_dictatorship h0 h1 (C := Set.univ)
+   exact h2
    sorry -- idk wtf is happening here
    exact univ_coalition_decisive h1
