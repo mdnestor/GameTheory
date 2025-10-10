@@ -150,14 +150,6 @@ theorem exists_minimal_decisive_coalition [Nonempty I] [Fintype I] [∀ C: Set I
    exact pareto_univ_decisive h
    exact Fintype.card_setUniv
 
--- Cannot have an empty decisive coalition
--- This actually isn't needed because group contraction only splits into nontmpy...
-theorem decisive_coalition_nonempty [Fintype I] [∀ C: Set I, ∀ i, Decidable (i ∈ C)] {F: (I → Prefs X) → Prefs X} (h1: pareto F) {C: Set I} (h2: coalition_decisive F C): Nonempty C := by
-  simp_all [coalition_decisive, coalition_decisive_over]
-
-
-  sorry
-
 theorem decisive_coalition_contraction [Fintype I] [∀ C: Set I, ∀ i, Decidable (i ∈ C)] (h0: ∀ (x y : X), ∃ z, x ≠ z ∧ y ≠ z) {F: (I → Prefs X) → Prefs X} {C: Set I} (h1: coalition_decisive F C) (h2: 2 ≤ Fintype.card C) (hF2: pareto F) (hF3: iia F): ∃ C', C' < C ∧ coalition_decisive F C' := by
   -- C has at least 2 elements, so there exists nonempty partition
   have: ∃ C1: Set I, Nonempty C1 ∧ C1 < C := sorry
@@ -199,11 +191,9 @@ theorem decisive_coalition_minimal [Nonempty I] [Fintype I] [∀ C: Set I, ∀ i
   obtain ⟨n, hn⟩ := exists_minimal_decisive_coalition hF2
   obtain ⟨C, hC0, hC1, hC2⟩ := hn.1
   have n_neq_zero: n ≠ 0 := by
-    intro
+    subst hC2
     simp_all
-    have := Set.subset_eq_empty hC2 rfl
-    have := decisive_coalition_nonempty hF2 hC1
-    simp_all
+    exact hC0
   have n_lt_two: n < 2 := by
     apply Classical.not_not.mp
     intro h
