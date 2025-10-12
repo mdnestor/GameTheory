@@ -6,6 +6,7 @@ import Mathlib.Data.Fintype.Powerset
 import Mathlib.Data.Fintype.Basic
 import Mathlib.Data.Fintype.Sets
 
+-- TODO : Replace some Fintype(Set) with Finset
 --import Mathlib.Tactic
 
 import Mathlib.Order.Minimal
@@ -19,6 +20,12 @@ class Pref {X: Type} (p: X → X → Prop): Prop where
   refl: ∀ x, p x x
   trans: ∀ x y z, p x y → p y z → p x z
   total: ∀ x y, p x y ∨ p y x
+
+def Pref.trivial (X: Type): Pref (fun _ _: X => True) := {
+  refl := fun _ => by trivial
+  trans := fun _ _ _ => by trivial
+  total := fun _ _ => by trivial
+}
 
 def Prefs (O: Type): Set (O → O → Prop) :=
   {R | Pref R}
@@ -50,11 +57,14 @@ theorem univ_coalition_decisive {F: (I → Prefs X) → Prefs X} (h: pareto F): 
   intro x y π h1
   exact h π x y fun i => h1 i trivial
 
-def decisive (F: (I → Prefs X) → Prefs X) (i: I) (o1 o2: X): Prop :=
-  ∀ π, π i o1 o2 → F π o1 o2
+def decisive (F: (I → Prefs X) → Prefs X) (i: I) (x y: X): Prop :=
+  ∀ π, π i x y → F π x y
 
 def dictator (F: (I → Prefs X) → Prefs X) (i: I): Prop :=
-  ∀ o1 o2, decisive F i o1 o2
+  ∀ x y, decisive F i x y
+
+def liberal (F: (I → Prefs X) → Prefs X): Prop :=
+  ∀ i, ∃ x y, decisive F i x y
 
 def dictatorship (F: (I → Prefs X) → Prefs X): Prop :=
   ∃ i, dictator F i
@@ -62,51 +72,59 @@ def dictatorship (F: (I → Prefs X) → Prefs X): Prop :=
 def iia (F: (I → Prefs X) → Prefs X): Prop :=
   ∀ π1 π2 x y, (∀ i, π1 i x y ↔ π2 i x y) → (F π1 x y ↔ F π2 x y)
 
+-- ∀ x z, π x z ∧ π x y ↔ π x z ∧ ¬ π x y
+-- ∀ x z, π x z ∧ π y z ↔ π x z ∧ ¬ π y z
+
 -- Given a profile π, and distinct x, y, z, can always find a modified profile π' such that
 -- πi x z ↔ πi' x z
 -- ∀ i ∈ A, πi x y
 -- ∀ i ∈ Aᶜ, πi y x
 -- ∀ i ∈ B, πi y z
 -- ∀ i ∈ Bᶜ, πi z y
-theorem exists_modified_vote (π: I → Prefs X) {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z) (A: Set I) (B: Set I):
-  ∃ π': I → Prefs X, (∀ i, π i x z ↔ π' i x z) ∧ (∀ i ∈ A, π' i x y) ∧ (∀ i ∉ A, π' i y x) ∧ (∀ i ∈ B, π' i y z) ∧ (∀ i ∉ B, π' i z y) := by
+-- This needs an additional hypothesis about voters in a set...
+theorem exists_modified_vote (π: I → Prefs X) {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z) {C: Set I} (h: ∀ i ∈ C, π i x z):
+  ∃ π': I → Prefs X, (∀ i, π i x z ↔ π' i x z) ∧ (∀ i ∈ C, π' i x y ∧ π' i y z) ∧ (∀ i ∉ C, π' i y x ∧ π' i y z) := by
+  sorry
+
+theorem exists_modified_vote' (π: I → Prefs X) {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z) {C: Set I} (h: ∀ i ∈ C, π i x z):
+  ∃ π': I → Prefs X, (∀ i, π i x z ↔ π' i x z) ∧ (∀ i ∈ C, π' i x y ∧ π' i y z) ∧ (∀ i ∉ C, π' i x y ∧ π' i z y) := by
   sorry
 
 theorem decisive_spread_forward {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z) {F: (I → Prefs X) → Prefs X} (hF: pareto F) (hF2: iia F) {C: Set I} (h: coalition_weak_decisive_over F C x y): coalition_decisive_over F C x z := by
   intro π h1
-  obtain ⟨π', h2, h3, h4⟩ := exists_modified_vote π hxy hxz hyz C Set.univ
+  obtain ⟨π', h2, h3, h4⟩ := exists_modified_vote π hxy hxz hyz h1
   simp_all [hF2 π π' x z h2]
   apply (F π').property.trans _ y
   · apply h
     constructor
     · intro i hi
-      exact h3 i hi
+      exact (h3 i hi).left
     · intro i hi
-      exact h4.left i hi
+      exact (h4 i hi).left
   · apply hF π'
     intro i
     by_cases hi: i ∈ C
-    · exact h4.right i
-    · exact h4.right i
+    · exact (h3 i hi).right
+    · exact (h4 i hi).right
 
 theorem decisive_spread_backward {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z) {F: (I → Prefs X) → Prefs X} (hF: pareto F) (hF2: iia F) {C: Set I} (h: coalition_weak_decisive_over F C x y): coalition_decisive_over F C z y := by
   intro π h1
   have hzx: z ≠ x := by exact id (Ne.symm hxz)
   have hzy: z ≠ y := by exact id (Ne.symm hyz)
-  obtain ⟨π', h2, h3, h4⟩ := exists_modified_vote π hzx hzy hxy Set.univ C
+  obtain ⟨π', h2, h3, h4⟩ := exists_modified_vote' π hzx hzy hxy h1
   simp_all [hF2 π π' z y h2]
   apply (F π').property.trans _ x
   · apply hF π'
     intro i
     by_cases hi: i ∈ C
-    · exact (h3 i)
-    · exact (h3 i)
+    · exact (h3 i hi).left
+    · exact (h4 i hi).left
   · apply h
     constructor
     · intro i hi
-      exact h4.left i hi
+      exact (h3 i hi).right
     · intro i hi
-      exact (h4.right i hi)
+      exact (h4 i hi).right
 
 theorem decisive_spread_symmetric (h0: ∀ x y: X, ∃ z, x ≠ z ∧ y ≠ z) {x y: X} (hxy: x ≠ y) {F: (I → Prefs X) → Prefs X} (hF: pareto F) (hF2: iia F) {C: Set I} (h: coalition_weak_decisive_over F C x y): coalition_decisive_over F C y x := by
   obtain ⟨z, hxz, hyz⟩ := h0 x y
@@ -160,15 +178,61 @@ theorem exists_minimal_decisive_coalition [Nonempty I] [Fintype I] [∀ C: Set I
    exact pareto_univ_decisive h
    exact Fintype.card_setUniv
 
-theorem decisive_coalition_contraction [Fintype I] [∀ C: Set I, ∀ i, Decidable (i ∈ C)] (h0: ∀ (x y : X), ∃ z, x ≠ z ∧ y ≠ z) {F: (I → Prefs X) → Prefs X} {C: Set I} (h1: coalition_decisive F C) (h2: 2 ≤ Fintype.card C) (hF2: pareto F) (hF3: iia F): ∃ C', C'.Nonempty ∧ C' < C ∧ coalition_decisive F C' := by
+theorem decisive_coalition_contraction [Fintype I] [Fintype X] [∀ C: Set I, ∀ i, Decidable (i ∈ C)] (h0: ∀ (x y : X), ∃ z, x ≠ z ∧ y ≠ z) {F: (I → Prefs X) → Prefs X} {C: Set I} (h1: coalition_decisive F C) (h2: 2 ≤ Fintype.card C) (hF2: pareto F) (hF3: iia F) (hX: Fintype.card X ≥ 3): ∃ C', C'.Nonempty ∧ C' < C ∧ coalition_decisive F C' := by
   -- C has at least 2 elements, so there exists nonempty partition
-  have: ∃ C1: Set I, Nonempty C1 ∧ C1 < C := sorry
-  obtain ⟨C1, hC11, hC12⟩ := this
+  have: 1 < Fintype.card C := by exact h2
+  obtain ⟨i, j, hij⟩ := Fintype.exists_pair_of_one_lt_card this
+  let C1: Set I := {i.val}
+  --exists C1
+  --constructor
+  --simp_all only [ne_eq, Fintype.card_ofFinset, ge_iff_le, Set.singleton_nonempty, C1]
+  --constructor
+  have: j.val ∈ C := j.prop
+  have: j.val ∉ C1 := by
+    simp_all only [ne_eq, Fintype.card_ofFinset, ge_iff_le, Subtype.coe_prop, Set.mem_singleton_iff, C1]
+    obtain ⟨val, property⟩ := i
+    obtain ⟨val_1, property_1⟩ := j
+    simp_all only [Subtype.mk.injEq]
+    apply Aesop.BuiltinRules.not_intro
+    intro a
+    subst a
+    simp_all only [not_true_eq_false]
+  have C1_lt_C: C1 < C := by
+    apply Set.ssubset_iff_subset_ne.mpr
+    constructor
+
+    simp_all only [ne_eq, Fintype.card_ofFinset, ge_iff_le, Subtype.coe_prop, Set.mem_singleton_iff,
+      Set.singleton_subset_iff, C1]
+    (expose_names; exact Ne.symm (ne_of_mem_of_not_mem' this_2 this))
+  have: Nonempty C1 := by exact instNonemptyOfInhabited
+  have: C1 < C := C1_lt_C
+  --have: ∃ C1: Set I, Nonempty C1 ∧ C1 < C := sorry
+  --obtain ⟨C1, hC11, hC12⟩ := this
+  have hC11: Nonempty C1 := by (expose_names; exact this_4)
+  have hC12: C1 < C := by exact C1_lt_C
   let C2 := C \ C1
-  have hC2: Nonempty C2 := sorry -- obvious
-  have: ∃ x y z: X, x ≠ y ∧ x ≠ z ∧ y ≠ z := sorry
-  obtain ⟨x, y, z, hxy, hxz, hyz⟩ := this
-  have: ∃ π: I → Prefs X, (∀ i ∈ C1, π i x y ∧ π i y z) ∧ (∀ i ∈ C2, π i z x ∧ π i x y) ∧ (∀ i ∉ C, π i y z ∧ π i z x) := sorry
+  have hC2: Nonempty C2 := by
+    rename_i inst inst_1 inst_2 this_1 this_2 this_3 this_4
+    simp_all [C1, C2]
+    obtain ⟨val, property⟩ := i
+    obtain ⟨val_1, property_1⟩ := j
+    simp_all only [Subtype.mk.injEq]
+    apply Exists.intro
+    apply And.intro
+    apply property_1
+    simp_all only [not_false_eq_true]
+  have: Fintype.card X > 2 := by exact hX
+  obtain ⟨x, y, z, hxy, hxz, hyz⟩ := Fintype.two_lt_card_iff.mp this
+  have: ∃ π: I → Prefs X, (∀ i ∈ C1, π i x y ∧ π i y z) ∧ (∀ i ∈ C2, π i z x ∧ π i x y) ∧ (∀ i ∉ C, π i y z ∧ π i z x) := by
+    exists fun _ => ⟨fun _ _ => True, Pref.trivial X⟩
+    constructor
+    intros
+    trivial
+    constructor
+    intros
+    trivial
+    intros
+    trivial
   obtain ⟨π, h3, h4, h5⟩ := this
   have := (F π).property.total x z
   match this with
@@ -180,8 +244,11 @@ theorem decisive_coalition_contraction [Fintype I] [∀ C: Set I, ∀ i, Decidab
     simp_all only [Fintype.card_ofFinset, nonempty_subtype, Set.lt_eq_ssubset, ne_eq, true_or, C2]
     apply decisive_spread h0 hxz hF2 hF3
     intro π' ⟨h7, h8⟩
-    have: ∃ π'': I → Prefs X, (∀ i, π' i x z ↔ π'' i x z) ∧ (∀ i ∈ C, π'' i x y) ∧ (∀ i, π'' i y z) := by sorry
-    obtain ⟨π'', h9, h10, h11⟩ := exists_modified_vote π' hxy hxz hyz C Set.univ
+
+    obtain ⟨π'', h9, h10, h11⟩ := exists_modified_vote π' hxy hxz hyz h7
+
+
+
     simp [hF3 π' π'' x z h9]
     apply h1
     intro i hi
@@ -203,15 +270,15 @@ theorem decisive_coalition_contraction [Fintype I] [∀ C: Set I, ∀ i, Decidab
     simp_all only [Fintype.card_ofFinset, nonempty_subtype, Set.lt_eq_ssubset, ne_eq, C2]
     apply decisive_spread h0 hxz hF2 hF3
     intro π' ⟨h7, h8⟩
-    have: ∃ π'': I → Prefs X, (∀ i, π' i x z ↔ π'' i x z) ∧ (∀ i ∈ C, π'' i x y) ∧ (∀ i, π'' i y z) := by sorry
-    obtain ⟨π'', h9, h10, h11⟩ := this
+    have: ∃ π'': I → Prefs X, (∀ i, π' i x z ↔ π'' i x z) ∧ (∀ i ∈ C, π'' i x y) ∧ (∀ i, π'' i y z) := by
+      sorry
     rw [hF3 π' π'' x z h9]
     apply h1
     intro i hi
     exact (π'' i).property.trans x y z (h10 i hi) (h11 i)
   }
 
-theorem decisive_coalition_minimal [Nonempty I] [Fintype I] [∀ C: Set I, ∀ i, Decidable (i ∈ C)] (h0: ∀ (x y : X), ∃ z, x ≠ z ∧ y ≠ z) {F: (I → Prefs X) → Prefs X} (hF2: pareto F) (hF3: iia F): Minimal (exists_nonempty_coalition_of_size F) 1 := by
+theorem decisive_coalition_minimal [Nonempty I] [Fintype X] [Fintype I] [∀ C: Set I, ∀ i, Decidable (i ∈ C)] (h0: ∀ (x y : X), ∃ z, x ≠ z ∧ y ≠ z) {F: (I → Prefs X) → Prefs X} (hF2: pareto F) (hF3: iia F) (hX: Fintype.card X ≥ 3): Minimal (exists_nonempty_coalition_of_size F) 1 := by
   obtain ⟨n, hn⟩ := exists_minimal_decisive_coalition hF2
   obtain ⟨C, hC0, hC1, hC2⟩ := hn.1
   have n_neq_zero: n ≠ 0 := by
@@ -223,24 +290,18 @@ theorem decisive_coalition_minimal [Nonempty I] [Fintype I] [∀ C: Set I, ∀ i
     intro h
     simp at h
     rw [←hC2] at h
-    obtain ⟨C', hC3, hC4, hC5⟩ := decisive_coalition_contraction h0 hC1 h hF2 hF3
-    have: Fintype.card C' < n := by sorry
-    -- from C' ⊂ C get a strict card inequality
+    obtain ⟨C', hC3, hC4, hC5⟩ := decisive_coalition_contraction h0 hC1 h hF2 hF3 hX
     have hlt_C' : Fintype.card C' < Fintype.card C :=
       Set.card_lt_card hC4
     have hlt : Fintype.card C' < n := by
       simpa [hC2] using hlt_C'
-
     have ⟨hPn, hMin⟩ := hn
-    -- so applying hMin gives a contradiction
-    --have hcontra := hMin (Fintype.card C') hlt h_exists
-    -- should be easy
-
-
-    --exact hn.2 (Fintype.card C') hC4 this
-
-    --have hC4 := Set.card_lt_card hC3
-    sorry
+    have: (exists_nonempty_coalition_of_size F) (Fintype.card ↑C') := by
+      exists C'
+    have := Minimal.le_of_le hn this
+    have h1: Fintype.card ↑C' + 1 ≤ n := by exact hlt
+    have := Minimal.not_prop_of_lt hn hlt
+    contradiction
   have: n = 1 := by
     apply Nat.le_antisymm
     exact Nat.le_of_lt_succ n_lt_two
@@ -248,15 +309,20 @@ theorem decisive_coalition_minimal [Nonempty I] [Fintype I] [∀ C: Set I, ∀ i
   rw [←this]
   exact hn
 
-theorem exists_dictatorship [Nonempty I] [Fintype I] (h0: ∀ (x y : X), ∃ z, x ≠ z ∧ y ≠ z) [∀ C: Set I, ∀ i, Decidable (i ∈ C)] {F: (I → Prefs X) → Prefs X} (h1: pareto F) (h2: iia F) {C: Set I} (h3: 2 ≤ Fintype.card C) (h4: coalition_decisive F C): dictatorship F := by
-  have := decisive_coalition_minimal h0 h1 h2
+theorem exists_dictatorship [Nonempty I] [Fintype I] [Fintype X] (h0: ∀ (x y : X), ∃ z, x ≠ z ∧ y ≠ z) [∀ C: Set I, ∀ i, Decidable (i ∈ C)] {F: (I → Prefs X) → Prefs X} (h1: pareto F) (h2: iia F) {C: Set I} (h3: 2 ≤ Fintype.card C) (h4: coalition_decisive F C) (hX: Fintype.card X ≥ 3): dictatorship F := by
+  have := decisive_coalition_minimal h0 h1 h2 hX
   obtain ⟨x, hx⟩ := this
   obtain ⟨C, hC0, hC1, hC2⟩ := x
   have: Nonempty C := by
     apply Fintype.card_pos_iff.mp
     simp_all [Fintype.card_ofFinset, Nat.lt_add_one]
   have x: C := Classical.ofNonempty
-  have: C = (Set.singleton x.val) := by sorry -- should follow quickly from `hC2 : Fintype.card ↑C = 1`
+  have: C = (Set.singleton x.val) := by
+    have: Fintype.card C ≤ 1 := by exact Nat.le_of_eq hC2
+    have := Fintype.card_le_one_iff_subsingleton.mp this
+    rw [Set.singleton]
+    aesop
+  -- should follow quickly from `hC2 : Fintype.card ↑C = 1`
   rw [this] at hC1
   exists x
   intro o1 o2 p h
@@ -277,7 +343,12 @@ theorem singleton_pareto_dictatorship [Subsingleton I] [Nonempty I] {F: (I → P
    exists Classical.ofNonempty
    apply singleton_pareto_dictator h
 
-theorem arrow (h0: ∀ (x y : X), ∃ z, x ≠ z ∧ y ≠ z) [Fintype I] [Nonempty I] [∀ C: Set I, ∀ i, Decidable (i ∈ C)] (F: (I → Prefs X) → Prefs X) (h1: pareto F) (h2: iia F): dictatorship F := by
+theorem arrow [Fintype X] [Fintype I] [Nonempty I]
+  [∀ C: Set I, ∀ i, Decidable (i ∈ C)]
+  (h0: ∀ (x y : X), ∃ z, x ≠ z ∧ y ≠ z)
+  (hX: Fintype.card X ≥ 3) -- oh wait h0 and hX equivalent..
+  (F: (I → Prefs X) → Prefs X)
+  (h1: pareto F) (h2: iia F): dictatorship F := by
   by_cases h: Fintype.card I ≤ 1
   have := Fintype.card_le_one_iff_subsingleton.mp h
   exact singleton_pareto_dictatorship h1
@@ -287,3 +358,4 @@ theorem arrow (h0: ∀ (x y : X), ∃ z, x ≠ z ∧ y ≠ z) [Fintype I] [Nonem
   rw [Fintype.card_setUniv]
   exact h
   exact univ_coalition_decisive h1
+  exact hX

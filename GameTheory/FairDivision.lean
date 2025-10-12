@@ -30,11 +30,10 @@ variable {A C P U X: Type}
 
 class Assignment (A X: Type) where
   assign: A → X
-  pref: PreferenceProfile A X
+  pref: A → Endorelation X
 
 def envy_free {A X: Type} (A: Assignment A X): Prop :=
   ∀ i j, A.pref i (A.assign j) (A.assign i)
-
 
 
 class UtilityAssignment (A X U: Type) where
