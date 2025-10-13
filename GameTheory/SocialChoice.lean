@@ -90,6 +90,19 @@ theorem exists_modified_vote' (π: I → Prefs X) {x y z: X} (hxy: x ≠ y) (hxz
   ∃ π': I → Prefs X, (∀ i, π i x z ↔ π' i x z) ∧ (∀ i ∈ C, π' i x y ∧ π' i y z) ∧ (∀ i ∉ C, π' i x y ∧ π' i z y) := by
   sorry
 
+theorem exists_modified_vote''
+  {π : I → Prefs X} {x y z : X}
+  (hxy : x ≠ y) (hxz : x ≠ z) (hyz : y ≠ z)
+  {C₁ : Set I}
+  (h1 : ∀ i ∈ C₁, π i x z)
+  (h2 : ∀ i ∉ C₁, π i z x) :
+  ∃ π'' : I → Prefs X,
+    (∀ i, π i x z ↔ π'' i x z) ∧
+    (∀ i ∈ C₁, π'' i x y ∧ π'' i y z) ∧
+    (∀ i ∉ C₁, π'' i y z ∧ π'' i z x) := by
+  sorry
+
+
 theorem decisive_spread_forward {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z) {F: (I → Prefs X) → Prefs X} (hF: pareto F) (hF2: iia F) {C: Set I} (h: coalition_weak_decisive_over F C x y): coalition_decisive_over F C x z := by
   intro π h1
   obtain ⟨π', h2, h3, h4⟩ := exists_modified_vote π hxy hxz hyz h1
@@ -234,6 +247,7 @@ theorem decisive_coalition_contraction [Fintype I] [Fintype X] [∀ C: Set I, �
     intros
     trivial
   obtain ⟨π, h3, h4, h5⟩ := this
+
   have := (F π).property.total x z
   match this with
   | Or.inl h6 => {
@@ -245,7 +259,8 @@ theorem decisive_coalition_contraction [Fintype I] [Fintype X] [∀ C: Set I, �
     apply decisive_spread h0 hxz hF2 hF3
     intro π' ⟨h7, h8⟩
 
-    obtain ⟨π'', h9, h10, h11⟩ := exists_modified_vote π' hxy hxz hyz h7
+    obtain ⟨π'', h9, h10, h11⟩ := exists_modified_vote'' hxy hxz hyz h7 h8
+
 
 
 
@@ -253,6 +268,7 @@ theorem decisive_coalition_contraction [Fintype I] [Fintype X] [∀ C: Set I, �
     apply h1
     intro i hi
     apply (π'' i).property.trans x y z
+    have: i ∈ C1 := by exact?
     exact h10 i hi
     exact h11.2.1 i (by trivial)
   }
