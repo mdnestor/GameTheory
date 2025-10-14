@@ -6,48 +6,15 @@ import Mathlib.Data.Fintype.Powerset
 import Mathlib.Data.Fintype.Basic
 import Mathlib.Data.Fintype.Sets
 
--- TODO : Replace some Fintype(Set) with Finset
---import Mathlib.Tactic
-
 import Mathlib.Order.Minimal
 import Mathlib.Data.Set.Finite.Basic
 
-namespace SocialChoice
-
 variable {I X: Type}
-
 
 class Pref {X: Type} (p: X → X → Prop): Prop where
   refl: ∀ x, p x x
   trans: ∀ x y z, p x y → p y z → p x z
   total: ∀ x y, p x y ∨ p y x
-
-class StrictPref {X: Type} (p: X → X → Prop): Prop where
-  irrefl: ∀ x, ¬ p x x
-  trans: ∀ x y z, p x y → p y z → p x z
-  total: ∀ x y, p x y ∨ p y x
-
-def strictify {R: X → X → Prop} (P: Pref R): StrictPref (fun x y => R x y ∧ ¬ R y x) := {
-  irrefl := by exact fun x => and_not_self
-  trans := by
-    intro x y z ⟨h1, h2⟩ ⟨h3, h4⟩
-    constructor
-    exact P.trans _ _ _ h1 h3
-    intro h5
-    have h6 := P.trans y z x h3 h5
-    contradiction
-  total := by
-    intro x y
-
-    repeat' constructor
-
-}
-
-def Pref.trivial (X: Type): Pref (fun _ _: X => True) := {
-  refl := fun _ => by trivial
-  trans := fun _ _ _ => by trivial
-  total := fun _ _ => by trivial
-}
 
 def Prefs (O: Type): Set (O → O → Prop) :=
   {R | Pref R}
@@ -521,8 +488,74 @@ theorem exists_minimal_strict_decisive_coalition [Nonempty I] [Fintype I] [∀ C
   exact Fintype.card_setUniv
 
 
-def Total (R: X → X → Prop): Prop :=
-  ∀ x y, R x y ∨ R y x
+theorem strict_decisive_coalition_contraction_lemma {I X : Type}
+  [Fintype I] [Fintype X] --[(C : Set I) → (i : I) → Decidable (i ∈ C)]
+  (h0 : ∀ (x y : X), ∃ z, x ≠ z ∧ y ≠ z)
+  {F : (I → ↑(Prefs X)) → ↑(Prefs X)}
+  {C : Set I}
+  (hF2 : strict_pareto F)
+  (hF3 : iia F)
+  --{i : ↑C}
+  {C1 : Set I}--:= {↑i})
+  (hC11 : Nonempty ↑C1)
+  (hC12 : C1 < C)
+  {x y z : X}
+  (hxz : x ≠ z)
+  {π₀ : I → ↑(Prefs X)}
+  (h3 : ∀ i ∈ C1, strict (π₀ i) x y ∧ strict (π₀ i) y z)
+  (h4 : ∀ i ∈ C \ C1, strict (π₀ i) z x ∧ strict (π₀ i) x y)
+  (h5 : ∀ i ∉ C, strict (π₀ i) y z ∧ strict (π₀ i) z x)
+  (h6: strict (F π₀) x z):
+  ∃ C', C'.Nonempty ∧ C' < C ∧ coalition_strict_decisive F C' := by
+  classical
+  exists C1
+  constructor
+  exact Set.nonempty_coe_sort.mp hC11
+  constructor
+  simp_all [nonempty_subtype, Set.lt_eq_ssubset, ne_eq]
+  apply strict_decisive_spread h0 hxz hF2 hF3
+  assumption
+  intro π ⟨h7, h8⟩
+  have h9: ∀ i ∈ C1, strict (π₀ i) x z ∧ strict (π i) x z := by
+    intro i hi
+    have := h7 i hi
+    simp [h7 i hi, strict_trans_of_total_trans (h3 i hi).left (h3 i hi).right]
+  have h9': ∀ i ∈ C1, π₀ i x z ∧ π i x z := by
+    intro i hi
+    have := h9 i hi
+    exact ⟨this.1.1, this.2.1⟩
+  have h9'': ∀ i ∈ C1, ¬ π₀ i z x ∧ ¬ π i z x := by
+    intro i hi
+    have := h9 i hi
+    exact ⟨this.1.2, this.2.2⟩
+  have h10: ∀ i ∉ C1, strict (π₀ i) z x ∧ strict (π i) z x := by
+    intro i hi
+    by_cases hi1: i ∈ C
+    constructor
+    have: i ∈ C \ C1 := by
+      exact Set.mem_diff_of_mem hi1 hi
+    exact (h4 i this).left
+    exact h8 i hi
+    constructor
+    exact (h5 i hi1).right
+    simp_all
+  have h10': ∀ i ∉ C1, π₀ i z x ∧ π i z x := by
+    intro i hi
+    have := h10 i hi
+    exact ⟨this.1.1, this.2.1⟩
+  have h10': ∀ i ∉ C1, ¬ π₀ i x z ∧ ¬ π i x z := by
+    intro i hi
+    have := h10 i hi
+    exact ⟨this.1.2, this.2.2⟩
+  have h11: ∀ i, π₀ i x z ↔ π i x z := by
+    intro i; by_cases i ∈ C1
+    repeat simp_all
+  have h11': ∀ i, π₀ i z x ↔ π i z x := by
+    intro i; by_cases i ∈ C1
+    repeat simp_all
+  have := iia_strict hF3 h11 h11'
+  rw [←this]
+  exact h6
 
 theorem strict_decisive_coalition_contraction [Fintype I] [Fintype X] [∀ C: Set I, ∀ i, Decidable (i ∈ C)] (h0: ∀ (x y : X), ∃ z, x ≠ z ∧ y ≠ z) {F: (I → Prefs X) → Prefs X} {C: Set I} (h1: coalition_strict_decisive F C) (h2: 2 ≤ Fintype.card C) (hF2: strict_pareto F) (hF3: iia F) (hX: Fintype.card X ≥ 3): ∃ C', C'.Nonempty ∧ C' < C ∧ coalition_strict_decisive F C' := by
   -- C has at least 2 elements, so there exists nonempty partition
@@ -550,79 +583,33 @@ theorem strict_decisive_coalition_contraction [Fintype I] [Fintype X] [∀ C: Se
   have: C1 < C := C1_lt_C
   have hC11: Nonempty C1 := by (expose_names; exact this_4)
   have hC12: C1 < C := by exact C1_lt_C
-  let C2 := C \ C1
-  have hC2: Nonempty C2 := by
+  --let C2 := C \ C1
+  have hC2: (C \ C1).Nonempty := by
     rename_i inst inst_1 inst_2 this_1 this_2 this_3 this_4
-    simp_all [C1, C2]
+    simp_all [C1]
     obtain ⟨val, property⟩ := i
     obtain ⟨val_1, property_1⟩ := j
     simp_all only [Subtype.mk.injEq]
     apply Exists.intro
     apply And.intro
     apply property_1
-    simp_all only [not_false_eq_true]
+    simp_all --only [not_false_eq_true]
   have: Fintype.card X > 2 := by exact hX
   obtain ⟨x, y, z, hxy, hxz, hyz⟩ := Fintype.two_lt_card_iff.mp this
-  have: ∃ π₀: I → Prefs X, (∀ i ∈ C1, strict (π₀ i) x y ∧ strict (π₀ i) y z) ∧ (∀ i ∈ C2, strict (π₀ i) z x ∧ strict (π₀ i) x y) ∧ (∀ i ∉ C, strict (π₀ i) y z ∧ strict (π₀ i) z x) := by
+  have: ∃ π₀: I → Prefs X, (∀ i ∈ C1, strict (π₀ i) x y ∧ strict (π₀ i) y z) ∧ (∀ i ∈ C \ C1, strict (π₀ i) z x ∧ strict (π₀ i) x y) ∧ (∀ i ∉ C, strict (π₀ i) y z ∧ strict (π₀ i) z x) := by
     sorry
   obtain ⟨π₀, h3, h4, h5⟩ := this
   have := (F π₀).property.total x z
   have C1_sub_C: C1 ⊆ C := by exact subset_of_ssubset C1_lt_C
-  have C2_sub_C : C2 ⊆ C := by
+  have C2_sub_C : C \ C1 ⊆ C := by
     rw [Set.diff_subset_iff]
     exact Set.subset_union_right
-  -- strict order carries totality!
-  -- wait no it doesn't :(
+  by_cases h6: strict (F π₀) x z
+  exists C1
+  constructor
 
-  -- So by totality F π0 x z or F π0 z x
-  -- this is totality bruh...
+  sorry
 
-
-  have: strict (F π₀) x z ∨ strict (F π₀) z x := by
-    sorry
-  match this with
-  | Or.inl h6 => {
-    exists C1
-    constructor
-    exact Set.nonempty_coe_sort.mp hC11
-    constructor
-    simp_all only [Fintype.card_ofFinset, nonempty_subtype, Set.lt_eq_ssubset, ne_eq, true_or, C2]
-    apply strict_decisive_spread h0 hxz hF2 hF3
-    assumption
-    intro π ⟨h7, h8⟩
-    have h9: ∀ i ∈ C1, strict (π₀ i) x z ∧ strict (π i) x z := by
-      intro i hi
-      have := h7 i hi
-      simp [h7 i hi, strict_trans_of_total_trans (h3 i hi).left (h3 i hi).right]
-    have h9': ∀ i ∈ C1, π₀ i x z ∧ π i x z := by
-      intro i hi
-      have := h9 i hi
-      exact ⟨this.1.1, this.2.1⟩
-    have h9'': ∀ i ∈ C1, ¬ π₀ i z x ∧ ¬ π i z x := by
-      intro i hi
-      have := h9 i hi
-      exact ⟨this.1.2, this.2.2⟩
-    have h10: ∀ i ∉ C1, strict (π₀ i) z x ∧ strict (π i) z x := by
-      sorry
-    have h10': ∀ i ∉ C1, π₀ i z x ∧ π i z x := by
-      intro i hi
-      have := h10 i hi
-      exact ⟨this.1.1, this.2.1⟩
-    have h10': ∀ i ∉ C1, ¬ π₀ i x z ∧ ¬ π i x z := by
-      intro i hi
-      have := h10 i hi
-      exact ⟨this.1.2, this.2.2⟩
-    have h11: ∀ i, π₀ i x z ↔ π i x z := by
-      intro i; by_cases i ∈ C1
-      repeat simp_all
-    have h11': ∀ i, π₀ i z x ↔ π i z x := by
-      intro i; by_cases i ∈ C1
-      repeat simp_all
-    have := iia_strict hF3 h11 h11'
-    rw [←this]
-    exact h6
-  }
-  | Or.inr h6 => { sorry}
 
 
 theorem strict_decisive_coalition_minimal [Nonempty I] [Fintype X] [Fintype I] [∀ C: Set I, ∀ i, Decidable (i ∈ C)] (h0: ∀ (x y : X), ∃ z, x ≠ z ∧ y ≠ z) {F: (I → Prefs X) → Prefs X} (hF2: strict_pareto F) (hF3: iia F) (hX: Fintype.card X ≥ 3): Minimal (exists_nonempty_strict_decisive_coalition_of_size F) 1 := by
