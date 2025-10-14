@@ -16,10 +16,32 @@ namespace SocialChoice
 
 variable {I X: Type}
 
+
 class Pref {X: Type} (p: X → X → Prop): Prop where
   refl: ∀ x, p x x
   trans: ∀ x y z, p x y → p y z → p x z
   total: ∀ x y, p x y ∨ p y x
+
+class StrictPref {X: Type} (p: X → X → Prop): Prop where
+  irrefl: ∀ x, ¬ p x x
+  trans: ∀ x y z, p x y → p y z → p x z
+  total: ∀ x y, p x y ∨ p y x
+
+def strictify {R: X → X → Prop} (P: Pref R): StrictPref (fun x y => R x y ∧ ¬ R y x) := {
+  irrefl := by exact fun x => and_not_self
+  trans := by
+    intro x y z ⟨h1, h2⟩ ⟨h3, h4⟩
+    constructor
+    exact P.trans _ _ _ h1 h3
+    intro h5
+    have h6 := P.trans y z x h3 h5
+    contradiction
+  total := by
+    intro x y
+
+    repeat' constructor
+
+}
 
 def Pref.trivial (X: Type): Pref (fun _ _: X => True) := {
   refl := fun _ => by trivial
@@ -59,6 +81,8 @@ theorem univ_coalition_decisive {F: (I → Prefs X) → Prefs X} (h: pareto F): 
 
 
 /- strict decisive -/
+
+-- I need to show strict is a pref?
 
 def strict (p : Prefs X) (a b : X) : Prop := p a b ∧ ¬ p b a
 
@@ -497,10 +521,12 @@ theorem exists_minimal_strict_decisive_coalition [Nonempty I] [Fintype I] [∀ C
   exact Fintype.card_setUniv
 
 
-
+def Total (R: X → X → Prop): Prop :=
+  ∀ x y, R x y ∨ R y x
 
 theorem strict_decisive_coalition_contraction [Fintype I] [Fintype X] [∀ C: Set I, ∀ i, Decidable (i ∈ C)] (h0: ∀ (x y : X), ∃ z, x ≠ z ∧ y ≠ z) {F: (I → Prefs X) → Prefs X} {C: Set I} (h1: coalition_strict_decisive F C) (h2: 2 ≤ Fintype.card C) (hF2: strict_pareto F) (hF3: iia F) (hX: Fintype.card X ≥ 3): ∃ C', C'.Nonempty ∧ C' < C ∧ coalition_strict_decisive F C' := by
   -- C has at least 2 elements, so there exists nonempty partition
+  classical
   have: 1 < Fintype.card C := by exact h2
   obtain ⟨i, j, hij⟩ := Fintype.exists_pair_of_one_lt_card this
   let C1: Set I := {i.val}
@@ -537,14 +563,23 @@ theorem strict_decisive_coalition_contraction [Fintype I] [Fintype X] [∀ C: Se
     simp_all only [not_false_eq_true]
   have: Fintype.card X > 2 := by exact hX
   obtain ⟨x, y, z, hxy, hxz, hyz⟩ := Fintype.two_lt_card_iff.mp this
-  have: ∃ π: I → Prefs X, (∀ i ∈ C1, strict (π i) x y ∧ strict (π i) y z) ∧ (∀ i ∈ C2, strict (π i) z x ∧ strict (π i) x y) ∧ (∀ i ∉ C, strict (π i) y z ∧ strict (π i) z x) := by
+  have: ∃ π₀: I → Prefs X, (∀ i ∈ C1, strict (π₀ i) x y ∧ strict (π₀ i) y z) ∧ (∀ i ∈ C2, strict (π₀ i) z x ∧ strict (π₀ i) x y) ∧ (∀ i ∉ C, strict (π₀ i) y z ∧ strict (π₀ i) z x) := by
     sorry
-  obtain ⟨π, h3, h4, h5⟩ := this
-  have := (F π).property.total x z
+  obtain ⟨π₀, h3, h4, h5⟩ := this
+  have := (F π₀).property.total x z
   have C1_sub_C: C1 ⊆ C := by exact subset_of_ssubset C1_lt_C
   have C2_sub_C : C2 ⊆ C := by
     rw [Set.diff_subset_iff]
     exact Set.subset_union_right
+  -- strict order carries totality!
+  -- wait no it doesn't :(
+
+  -- So by totality F π0 x z or F π0 z x
+  -- this is totality bruh...
+
+
+  have: strict (F π₀) x z ∨ strict (F π₀) z x := by
+    sorry
   match this with
   | Or.inl h6 => {
     exists C1
@@ -554,8 +589,38 @@ theorem strict_decisive_coalition_contraction [Fintype I] [Fintype X] [∀ C: Se
     simp_all only [Fintype.card_ofFinset, nonempty_subtype, Set.lt_eq_ssubset, ne_eq, true_or, C2]
     apply strict_decisive_spread h0 hxz hF2 hF3
     assumption
-    intro π' ⟨h7, h8⟩
-    sorry
+    intro π ⟨h7, h8⟩
+    have h9: ∀ i ∈ C1, strict (π₀ i) x z ∧ strict (π i) x z := by
+      intro i hi
+      have := h7 i hi
+      simp [h7 i hi, strict_trans_of_total_trans (h3 i hi).left (h3 i hi).right]
+    have h9': ∀ i ∈ C1, π₀ i x z ∧ π i x z := by
+      intro i hi
+      have := h9 i hi
+      exact ⟨this.1.1, this.2.1⟩
+    have h9'': ∀ i ∈ C1, ¬ π₀ i z x ∧ ¬ π i z x := by
+      intro i hi
+      have := h9 i hi
+      exact ⟨this.1.2, this.2.2⟩
+    have h10: ∀ i ∉ C1, strict (π₀ i) z x ∧ strict (π i) z x := by
+      sorry
+    have h10': ∀ i ∉ C1, π₀ i z x ∧ π i z x := by
+      intro i hi
+      have := h10 i hi
+      exact ⟨this.1.1, this.2.1⟩
+    have h10': ∀ i ∉ C1, ¬ π₀ i x z ∧ ¬ π i x z := by
+      intro i hi
+      have := h10 i hi
+      exact ⟨this.1.2, this.2.2⟩
+    have h11: ∀ i, π₀ i x z ↔ π i x z := by
+      intro i; by_cases i ∈ C1
+      repeat simp_all
+    have h11': ∀ i, π₀ i z x ↔ π i z x := by
+      intro i; by_cases i ∈ C1
+      repeat simp_all
+    have := iia_strict hF3 h11 h11'
+    rw [←this]
+    exact h6
   }
   | Or.inr h6 => { sorry}
 
