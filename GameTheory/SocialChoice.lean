@@ -1,3 +1,13 @@
+/-
+
+Arrow's impossibility theorem.
+
+Based on the decisive coalitions argument.
+
+TODO: re parameterize existence lemmas.
+
+-/
+
 import Mathlib.Data.Set.Finite.Basic
 import Mathlib.Order.Minimal
 
@@ -72,76 +82,129 @@ def rank_pref (r: X → Nat): Pref (fun a b => r a ≤ r b) := {
   total := fun x y => Nat.le_total (r x) (r y)
 }
 
-theorem modify1
-  (p: Prefs X)
-  {x y z : X}
-  (hxy : x ≠ y) (hxz : x ≠ z) (hyz : y ≠ z)
-  (h : p x z):
-  ∃ p' : Prefs X, (p x z ↔ p' x z) ∧ p' x y ∧ p' y z := by
+theorem modify_pref (p: Prefs X) (x y z : X) (hxy : x ≠ y) (hxz : x ≠ z) (hyz : y ≠ z) (h : strict p x z):
+  ∃ p' : Prefs X, (p x z ↔ p' x z) ∧ (p z x ↔ p' z x) ∧ strict p' x y ∧ strict p' y z := by
   classical
-  let r: X → Nat := fun a => if a = x then 0 else if a = y then 1 else if a = z then 1 else 0
-  use ⟨fun a b => r a ≤ r b, rank_pref r⟩
-  simp [r]
-  constructor
-  exact h
-  repeat (split; repeat simp_all)
+  let r: X → Nat := fun a => if a = x then 0 else if a = y then 1 else if a = z then 2 else 0
+  let pref := rank_pref r
+  exists ⟨fun a b => r a ≤ r b, rank_pref r⟩
+  simp_all [r, strict, Ne.symm hxy, Ne.symm hyz, Ne.symm hxz]
 
-theorem modify2
-  (p: Prefs X)
-  {x y z : X}
-  (hxy : x ≠ y) (hxz : x ≠ z) (hyz : y ≠ z):
-  ∃ p' : Prefs X, (p x z ↔ p' x z) ∧ p' x y ∧ p' z y := by
-    classical
-  let r: X → Nat := fun a => if a = x then 0 else if a = y then 2 else if a = z then 1 else 0
-  use ⟨fun a b => r a ≤ r b, rank_pref r⟩
-  simp [r]
-  constructor
-  --repeat (split; repeat simp_all)
-  sorry
-  sorry
+theorem modify_pref' (p: Prefs X) (x y z : X) (hxy : x ≠ y) (hxz : x ≠ z) (hyz : y ≠ z):
+  ∃ p' : Prefs X, (p x z ↔ p' x z) ∧ (p z x ↔ p' z x) ∧ strict p' y x ∧ strict p' y z := by
+  classical
+  let p': X → X → Prop := fun a b => if a = y then
+    True
+  else if b = y then
+    False
+  else
+    p a b
+  have: Pref p' := {
+    reflexive := by
+      intro a
+      by_cases a = y <;> simp_all [p']
+      apply p.prop.reflexive
+    transitive := by
+      intro a b c h1 h2
+      by_cases a = y <;> by_cases b = y <;> by_cases c = y <;> simp_all [p']
+      exact p.prop.transitive h1 h2
+    total := by
+      intro a b
+      by_cases a = y <;> by_cases b = y <;> simp_all [p']
+      exact p.prop.total a b
+  }
+  use ⟨p', this⟩
+  simp_all [p', strict]
+  repeat' (apply And.intro)
+  intro
+  exact Ne.symm hyz
+  exact Or.inl (Ne.symm hyz)
+  exact Ne.symm hyz
 
-theorem exists_modified_vote2
-  (π : I → Prefs X)
-  {x y z : X}
-  (hxy : x ≠ y) (hxz : x ≠ z) (hyz : y ≠ z)
-  {C : Set I}
-  (h : ∀ i ∈ C, π i x z) :
-  ∃ π' : I → Prefs X,
-    (∀ i, π i x z ↔ π' i x z) ∧
-    (∀ i, π i z x ↔ π' i z x) ∧
-    (∀ i ∈ C, π' i x y ∧ π' i y z) ∧
-    (∀ i ∉ C, π' i y x ∧ π' i y z) := by
-  sorry
+theorem modify_pref'' (p: Prefs X) (x y z : X) (hxy : x ≠ y) (hxz : x ≠ z) (hyz : y ≠ z):
+  ∃ p' : Prefs X, (p x z ↔ p' x z) ∧ (p z x ↔ p' z x) ∧ strict p' x y ∧ strict p' z y := by
+  classical
+  let p': X → X → Prop := fun a b => if b = y then
+    True
+  else if a = y then
+    False
+  else
+    p a b
+  have: Pref p' := {
+    reflexive := by
+      intro a
+      by_cases a = y <;> simp_all [p']
+      apply p.prop.reflexive
+    transitive := by
+      intro a b c h1 h2
+      by_cases a = y <;> by_cases b = y <;> by_cases c = y <;> simp_all [p']
+      exact p.prop.transitive h1 h2
+    total := by
+      intro a b
+      by_cases a = y <;> by_cases b = y <;> simp_all [p']
+      exact p.prop.total a b
+  }
+  use ⟨p', this⟩
+  simp_all [p', strict]
+  repeat' (apply And.intro)
+  exact Or.inl (Ne.symm hyz)
+  intro
+  exact Ne.symm hyz
+  exact Ne.symm hyz
 
-theorem exists_modified_vote3
+theorem exists_modified_profile
   (π : I → Prefs X)
   {x y z : X}
   (hxy : x ≠ y) (hxz : x ≠ z) (hyz : y ≠ z)
   {C : Set I}
   (h : ∀ i ∈ C, strict (π i) x z) :
-  ∃ π' : I → Prefs X,
-    (∀ i, (π i) x z ↔ (π' i) x z) ∧
-    (∀ i, (π i) z x ↔ (π' i) z x) ∧
-    (∀ i ∈ C, strict (π' i) x y ∧ strict (π' i) y z) ∧
-    (∀ i ∉ C, strict (π' i) y x ∧ strict (π' i) y z) := by
-  sorry
+  ∃ π' : I → Prefs X, ∀ i,
+    ((π i) x z ↔ (π' i) x z) ∧
+    ((π i) z x ↔ (π' i) z x) ∧
+    (i ∈ C → strict (π' i) x y ∧ strict (π' i) y z) ∧
+    (i ∉ C → strict (π' i) y x ∧ strict (π' i) y z) := by
+  classical
+  use fun i => if hi: i ∈ C then
+    (modify_pref (π i) x y z hxy hxz hyz (h i hi)).choose
+  else
+    (modify_pref' (π i) x y z hxy hxz hyz).choose
+  intro i
+  by_cases hi: i ∈ C
+  simp [hi]
+  exact (modify_pref (π i) x y z hxy hxz hyz (h i hi)).choose_spec
+  simp [hi]
+  exact (modify_pref' (π i) x y z hxy hxz hyz).choose_spec
 
-theorem exists_modified_vote4
+theorem exists_modified_profile'
   (π : I → Prefs X)
   {x y z : X}
   (hxy : x ≠ y) (hxz : x ≠ z) (hyz : y ≠ z)
   {C : Set I}
-  (h : ∀ i ∈ C, π i x z) :
-  ∃ π' : I → Prefs X,
-    (∀ i, π i x z ↔ π' i x z) ∧
-    (∀ i, π i z x ↔ π' i z x) ∧
-    (∀ i ∈ C, π' i x y ∧ π' i y z) ∧
-    (∀ i ∉ C, π' i y x ∧ π' i y z) := by
-  sorry
+  (h : ∀ i ∈ C, strict (π i) x z) :
+  ∃ π' : I → Prefs X, ∀ i,
+    ((π i) x z ↔ (π' i) x z) ∧
+    ((π i) z x ↔ (π' i) z x) ∧
+    (i ∈ C → strict (π' i) x y ∧ strict (π' i) y z) ∧
+    (i ∉ C → strict (π' i) x y ∧ strict (π' i) z y) := by
+  classical
+  use fun i => if hi: i ∈ C then
+    (modify_pref (π i) x y z hxy hxz hyz (h i hi)).choose
+  else
+    (modify_pref'' (π i) x y z hxy hxz hyz).choose
+  intro i
+  by_cases hi: i ∈ C
+  simp [hi]
+  exact (modify_pref (π i) x y z hxy hxz hyz (h i hi)).choose_spec
+  simp [hi]
+  exact (modify_pref'' (π i) x y z hxy hxz hyz).choose_spec
 
 theorem decisive_spread_forward {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z) {F: (I → Prefs X) → Prefs X} (hF: pareto F) (hF2: iia F) {C: Set I} (h: coalition_weak_decisive_over F C x y): coalition_decisive_over F C x z := by
   intro π h1
-  obtain ⟨π', h2, h3, h4, h5⟩ := exists_modified_vote3 π hxy hxz hyz h1
+  obtain ⟨π', hπ'⟩ := exists_modified_profile π hxy hxz hyz h1
+  let h2 := fun i => (hπ' i).1
+  let h3 := fun i => (hπ' i).2.1
+  let h4 := fun i => (hπ' i).2.2.1
+  let h5 := fun i => (hπ' i).2.2.2
   rw [iia_strict hF2 h2 h3]
   apply strict_transitive (F π').prop.transitive
   · apply h
@@ -156,24 +219,15 @@ theorem decisive_spread_forward {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y
     · exact (h4 i hi).right
     · exact (h5 i hi).right
 
-theorem exists_modified_vote5
-  (π : I → Prefs X)
-  {x y z : X}
-  (hxy : x ≠ y) (hxz : x ≠ z) (hyz : y ≠ z)
-  {C : Set I}
-  (h : ∀ i ∈ C, strict (π i) x z) :
-  ∃ π' : I → Prefs X,
-    (∀ i, (π i) x z ↔ (π' i) x z) ∧
-    (∀ i, (π i) z x ↔ (π' i) z x) ∧
-    (∀ i ∈ C, strict (π' i) x y ∧ strict (π' i) y z) ∧
-    (∀ i ∉ C, strict (π' i) x y ∧ strict (π' i) z y) := by
-  sorry
-
 theorem decisive_spread_backward {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z) {F: (I → Prefs X) → Prefs X} (hF: pareto F) (hF2: iia F) {C: Set I} (h: coalition_weak_decisive_over F C x y): coalition_decisive_over F C z y := by
   intro π h1
   have hzx: z ≠ x := Ne.symm hxz
   have hzy: z ≠ y := Ne.symm hyz
-  obtain ⟨π', h2, h3, h4, h5⟩ := exists_modified_vote5 π hzx hzy hxy h1
+  obtain ⟨π', hπ'⟩ := exists_modified_profile' π hzx hzy hxy h1
+  let h2 := fun i => (hπ' i).1
+  let h3 := fun i => (hπ' i).2.1
+  let h4 := fun i => (hπ' i).2.2.1
+  let h5 := fun i => (hπ' i).2.2.2
   rw [iia_strict hF2 h2 h3]
   apply strict_transitive (F π').prop.transitive
   · apply hF π'
