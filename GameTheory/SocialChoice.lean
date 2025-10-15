@@ -10,6 +10,7 @@ TODO: re parameterize existence lemmas.
 
 import Mathlib.Data.Set.Finite.Basic
 import Mathlib.Order.Minimal
+import Mathlib.Order.SetNotation
 
 set_option linter.unusedVariables false
 
@@ -114,12 +115,7 @@ theorem modify_pref' (p: Prefs X) (x y z : X) (hxy : x ≠ y) (hxz : x ≠ z) (h
       exact p.prop.total a b
   }
   use ⟨p', this⟩
-  simp_all [p', strict]
-  repeat' (apply And.intro)
-  intro
-  exact Ne.symm hyz
-  exact Or.inl (Ne.symm hyz)
-  exact Ne.symm hyz
+  simp_all [p', strict, Ne.symm hyz]
 
 theorem modify_pref'' (p: Prefs X) (x y z : X) (hxy : x ≠ y) (hxz : x ≠ z) (hyz : y ≠ z):
   ∃ p' : Prefs X, (p x z ↔ p' x z) ∧ (p z x ↔ p' z x) ∧ strict p' x y ∧ strict p' z y := by
@@ -145,12 +141,7 @@ theorem modify_pref'' (p: Prefs X) (x y z : X) (hxy : x ≠ y) (hxz : x ≠ z) (
       exact p.prop.total a b
   }
   use ⟨p', this⟩
-  simp_all [p', strict]
-  repeat' (apply And.intro)
-  exact Or.inl (Ne.symm hyz)
-  intro
-  exact Ne.symm hyz
-  exact Ne.symm hyz
+  simp_all [p', strict, Ne.symm hyz]
 
 theorem exists_modified_profile
   (π : I → Prefs X)
@@ -197,6 +188,69 @@ theorem exists_modified_profile'
   exact (modify_pref (π i) x y z hxy hxz hyz (h i hi)).choose_spec
   simp [hi]
   exact (modify_pref'' (π i) x y z hxy hxz hyz).choose_spec
+
+theorem exists_acyclic_pref {x y z : X}
+  (hxy : x ≠ y) (hxz : x ≠ z) (hyz : y ≠ z):
+  ∃ p: Prefs X, strict p x y ∧ strict p y z := by
+  classical
+  let r: X → Nat := fun a => if a = x then 0 else if a = y then 1 else if a = z then 2 else 0
+  let pref := rank_pref r
+  exists ⟨fun a b => r a ≤ r b, rank_pref r⟩
+  simp_all [r, strict, Ne.symm hxy, Ne.symm hyz, Ne.symm hxz]
+
+theorem exists_condorcet_profile
+  {x y z : X}
+  (hxy : x ≠ y) (hxz : x ≠ z) (hyz : y ≠ z)
+  (c: I → Fin 3):
+  ∃ π : I → Prefs X, ∀ i,
+    (c i = 0 → strict (π i) x y ∧ strict (π i) y z) ∧
+    (c i = 1 → strict (π i) y z ∧ strict (π i) z x) ∧
+    (c i = 2 → strict (π i) z x ∧ strict (π i) x y) := by
+  classical
+  use fun i => match c i with
+  | 0 => (exists_acyclic_pref hxy hxz hyz).choose
+  | 1 => (exists_acyclic_pref hyz (Ne.symm hxy) (Ne.symm hxz)).choose
+  | 2 => (exists_acyclic_pref (Ne.symm hxz) (Ne.symm hyz) hxy).choose
+  intro i
+  match _: c i with
+  | 0 => simp_all; exact (exists_acyclic_pref hxy hxz hyz).choose_spec
+  | 1 => simp_all; exact (exists_acyclic_pref (hyz) (Ne.symm hxy) (Ne.symm hxz)).choose_spec
+  | 2 => simp_all; exact (exists_acyclic_pref (Ne.symm hxz) (Ne.symm hyz) hxy).choose_spec
+
+theorem exists_condorcet_profile'
+  {x y z : X}
+  (hxy : x ≠ y) (hxz : x ≠ z) (hyz : y ≠ z)
+  {A B C: Set I} (hAB: A ∩ B = ∅) (hAC: A ∩ C = ∅) (hBC: B ∩ C = ∅) (hABC: A ∪ B ∪ C = Set.univ):
+  ∃ π : I → Prefs X, ∀ i,
+    (i ∈ A → strict (π i) x y ∧ strict (π i) y z) ∧
+    (i ∈ B → strict (π i) y z ∧ strict (π i) z x) ∧
+    (i ∈ C → strict (π i) z x ∧ strict (π i) x y) := by
+  classical
+  let c: I → Fin 3 := fun i =>
+    if i ∈ A then 0 else if i ∈ B then 1 else 2
+  have: ∀ i, (i ∈ A ↔ c i = 0) ∧ (i ∈ B ↔ c i = 1) ∧ (i ∈ C ↔ c i = 2) := by
+    intro i
+    by_cases hA: i ∈ A <;> by_cases hB: i ∈ B <;> by_cases hC: i ∈ C <;> simp_all [c]
+    have := Set.mem_inter hA hB
+    simp_all
+    have := Set.mem_inter hA hB
+    simp_all
+    have := Set.mem_inter hA hC
+    simp_all
+    have := Set.mem_inter hB hC
+    simp_all
+    have: i ∉ A ∪ B ∪ C := by
+      intro h
+      match h with
+      | Or.inl h => match h with
+        | Or.inl h => contradiction
+        | Or.inr h => contradiction
+      | Or.inr h => contradiction
+    rw [hABC] at this
+    exact this trivial
+  obtain ⟨π, hπ⟩ := exists_condorcet_profile hxy hxz hyz c
+  exists π
+  simp_all
 
 theorem decisive_spread_forward {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z) {F: (I → Prefs X) → Prefs X} (hF: pareto F) (hF2: iia F) {C: Set I} (h: coalition_weak_decisive_over F C x y): coalition_decisive_over F C x z := by
   intro π h1
@@ -378,6 +432,29 @@ theorem decisive_coalition_contraction [Fintype I] [Fintype X] [∀ C: Set I, �
   have: 1 < Fintype.card C := by exact h2
   obtain ⟨i, j, hij⟩ := Fintype.exists_pair_of_one_lt_card this
   let C1: Set I := {i.val}
+  let C2 := C \ C1
+
+  -- show C1, C2, Cᶜ form a partition
+  have: C1 ∩ C2 = ∅ := by
+    exact Set.inter_diff_self C1 C
+  have: C1 ∩ Cᶜ = ∅ := by
+    simp_all only [ne_eq, Fintype.card_ofFinset, ge_iff_le, Set.inter_diff_self, Set.singleton_inter_eq_empty,
+      Set.mem_compl_iff, Subtype.coe_prop, not_true_eq_false, not_false_eq_true, C1, C2]
+  have: C2 ∩ Cᶜ = ∅ := by
+    simp_all only [ne_eq, Fintype.card_ofFinset, ge_iff_le, Set.inter_diff_self, Set.singleton_inter_eq_empty,
+      Set.mem_compl_iff, Subtype.coe_prop, not_true_eq_false, not_false_eq_true, C1, C2]
+    obtain ⟨val, property⟩ := i
+    obtain ⟨val_1, property_1⟩ := j
+    simp_all only [Subtype.mk.injEq]
+    ext x : 1
+    simp_all only [Set.mem_inter_iff, Set.mem_diff, Set.mem_singleton_iff, Set.mem_compl_iff, Set.mem_empty_iff_false,
+      iff_false, not_and, not_true_eq_false, not_false_eq_true, implies_true]
+  have: C1 ∪ C2 ∪ Cᶜ = Set.univ := by
+    simp_all only [ne_eq, Fintype.card_ofFinset, ge_iff_le, Set.inter_diff_self, Set.singleton_inter_eq_empty,
+      Set.mem_compl_iff, Subtype.coe_prop, not_true_eq_false, not_false_eq_true, Set.union_diff_self,
+      Set.singleton_union, Set.insert_eq_of_mem, Set.union_compl_self, C1, C2]
+
+
   have: j.val ∈ C := j.prop
   have: j.val ∉ C1 := by
     simp_all only [ne_eq, Fintype.card_ofFinset, ge_iff_le, Subtype.coe_prop, Set.mem_singleton_iff, C1]
@@ -393,10 +470,10 @@ theorem decisive_coalition_contraction [Fintype I] [Fintype X] [∀ C: Set I, �
     constructor
     simp_all only [ne_eq, Fintype.card_ofFinset, ge_iff_le, Subtype.coe_prop, Set.mem_singleton_iff,
       Set.singleton_subset_iff, C1]
-    (expose_names; exact Ne.symm (ne_of_mem_of_not_mem' this_2 this))
+    (expose_names; exact Ne.symm (ne_of_mem_of_not_mem' this_6 this)) -- (expose_names; exact Ne.symm (ne_of_mem_of_not_mem' this_2 this))
   have: Nonempty C1 := by exact instNonemptyOfInhabited
   have: C1 < C := C1_lt_C
-  have hC11: Nonempty C1 := by (expose_names; exact this_4)
+  have hC11: Nonempty C1 := by (expose_names; exact this_8)
   have hC12: C1 < C := by exact C1_lt_C
   let C2 := C \ C1
   have hC2: C2.Nonempty := by
@@ -409,16 +486,39 @@ theorem decisive_coalition_contraction [Fintype I] [Fintype X] [∀ C: Set I, �
     apply And.intro
     apply property_1
     simp_all only [Set.mem_singleton_iff, not_false_eq_true]
-  have: Fintype.card X > 2 := by exact hX
-  obtain ⟨x, y, z, hxy, hxz, hyz⟩ := Fintype.two_lt_card_iff.mp this
-  have: ∃ π₀: I → Prefs X, (∀ i ∈ C1, strict (π₀ i) x y ∧ strict (π₀ i) y z) ∧ (∀ i ∈ C2, strict (π₀ i) z x ∧ strict (π₀ i) x y) ∧ (∀ i ∉ C, strict (π₀ i) y z ∧ strict (π₀ i) z x) := by
-    sorry
-  obtain ⟨π₀, h3, h4, h5⟩ := this
-  have := (F π₀).property.total x z
   have C1_sub_C: C1 ⊆ C := by exact subset_of_ssubset C1_lt_C
   have C2_sub_C : C2 ⊆ C := by
     rw [Set.diff_subset_iff]
     exact Set.subset_union_right
+  have: C2 = C \ C1 := by
+    exact rfl
+  have: Fintype.card X > 2 := by exact hX
+  obtain ⟨x, y, z, hxy, hxz, hyz⟩ := Fintype.two_lt_card_iff.mp this
+  have: ∃ π₀: I → Prefs X, ∀ i,
+    (i ∈ C1 → strict (π₀ i) x y ∧ strict (π₀ i) y z) ∧
+    (i ∈ Cᶜ → strict (π₀ i) y z ∧ strict (π₀ i) z x) ∧
+    (i ∈ C2 → strict (π₀ i) z x ∧ strict (π₀ i) x y) := by
+    apply exists_condorcet_profile' hxy hxz hyz
+    (expose_names; exact this_3)
+    (expose_names; exact this_2)
+    rw [Set.inter_comm]
+    (expose_names; exact this_4)
+    have: C1 ∪ C2 ∪ Cᶜ = C1 ∪ Cᶜ ∪ C2 := by
+      exact Set.union_right_comm C1 C2 Cᶜ
+    rw [← this]
+    (expose_names; exact this_5)
+
+
+  --have: ∃ π₀: I → Prefs X, (∀ i ∈ C1, strict (π₀ i) x y ∧ strict (π₀ i) y z) ∧ (∀ i ∈ C2, strict (π₀ i) z x ∧ strict (π₀ i) x y) ∧ (∀ i ∉ C, strict (π₀ i) y z ∧ strict (π₀ i) z x) := by
+  --  sorry
+
+  obtain ⟨π₀, hπ₀⟩ := this
+  let h3 := fun i => (hπ₀ i).1
+  let h5 := fun i => (hπ₀ i).2.1
+  let h4 := fun i => (hπ₀ i).2.2
+
+  have := (F π₀).property.total x z
+
   have: strict (F π₀) x y := by
     apply h1
     intro i
@@ -453,21 +553,21 @@ theorem decisive_coalition_contraction [Fintype I] [Fintype X] [∀ C: Set I, �
   exact hC2
   constructor
   simp_all only [ne_eq, Fintype.card_ofFinset, ge_iff_le, Subtype.coe_prop, Set.mem_singleton_iff, Set.lt_eq_ssubset,
-    nonempty_subtype, exists_eq, gt_iff_lt, forall_eq, Set.mem_diff, and_imp, Set.singleton_subset_iff,
+    nonempty_subtype, exists_eq, gt_iff_lt, Set.singleton_subset_iff,
     Set.diff_singleton_subset_iff, Set.insert_eq_of_mem, subset_refl, Set.diff_ssubset_left_iff,
     Set.inter_singleton_nonempty, C1, C2]
 
   simp_all [nonempty_subtype, Set.lt_eq_ssubset, ne_eq]
   have hzy: z ≠ y := by exact fun a => hyz (id (Eq.symm a))
   apply decisive_spread h0 hzy hF2 hF3
-  simp_all only [Set.mem_singleton_iff, exists_eq, forall_eq, Set.mem_diff, and_imp, Set.singleton_subset_iff,
-    Subtype.coe_prop, Set.diff_singleton_subset_iff, Set.insert_eq_of_mem, subset_refl, ne_eq, nonempty_subtype, C1,
-    C2]
+  simp_all only [Set.mem_singleton_iff, exists_eq, Set.singleton_subset_iff, Subtype.coe_prop,
+    Set.diff_singleton_subset_iff, Set.insert_eq_of_mem, subset_refl, ne_eq, nonempty_subtype, Set.mem_diff, C1, C2]
   obtain ⟨val, property⟩ := i
   obtain ⟨val_1, property_1⟩ := j
-  obtain ⟨left, right⟩ := h3
   simp_all only [Subtype.mk.injEq]
   exact hC2
+
+  --exact hC2
 
   intro π ⟨h7, h8⟩
   have h9: ∀ i ∈ C2, strict (π₀ i) z y ∧ strict (π i) z y := by
@@ -492,7 +592,7 @@ theorem decisive_coalition_contraction [Fintype I] [Fintype X] [∀ C: Set I, �
     constructor
     have: i ∈ C \ C2 := by
       exact Set.mem_diff_of_mem hi1 hi
-    have: i ∈ C1 := by simp_all only [Set.mem_singleton_iff, exists_eq, forall_eq, Set.mem_diff, and_imp,
+    have: i ∈ C1 := by simp_all only [Set.mem_singleton_iff, exists_eq, Set.mem_diff, and_imp,
       Set.singleton_subset_iff, Subtype.coe_prop, Set.diff_singleton_subset_iff, Set.insert_eq_of_mem, subset_refl,
       ne_eq, not_false_eq_true, and_self, implies_true, not_and, Decidable.not_not, true_and, sdiff_sdiff_right_self,
       Set.le_eq_subset, inf_of_le_right, C1, C2]
@@ -519,7 +619,7 @@ theorem decisive_coalition_contraction [Fintype I] [Fintype X] [∀ C: Set I, �
     repeat simp_all
   have := iia_strict hF3 h11' h11
   rw [←this]
-  (expose_names; exact this_6)
+  (expose_names; exact this_11) -- (expose_names; exact this_6)
 
 theorem decisive_coalition_minimal [Nonempty I] [Fintype X] [Fintype I] [∀ C: Set I, ∀ i, Decidable (i ∈ C)] (h0: ∀ (x y : X), ∃ z, x ≠ z ∧ y ≠ z) {F: (I → Prefs X) → Prefs X} (hF2: pareto F) (hF3: iia F) (hX: Fintype.card X ≥ 3): Minimal (exists_nonempty_decisive_coalition_of_size F) 1 := by
   obtain ⟨n, hn⟩ := exists_minimal_decisive_coalition hF2
