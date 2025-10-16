@@ -114,6 +114,14 @@ class OutcomeGame (I S X: Type) where
   play: (I → S) → X
   pref: I → Endorelation X
 
+-- Social choice as an example of an outcome game
+
+example (pref: I → Endorelation X) (F: (I → Endorelation X) → Endorelation X):
+  OutcomeGame I (Endorelation X) (Endorelation X) := {
+  play := F
+  pref := fun i p₁ p₂ => ∀ x y, pref i x y → p₁ x y → p₂ x y
+}
+
 -- Every utility game is an outcome game where the outcomes are utility assignments
 -- and players prefer outcomes where they get higher utility.
 
