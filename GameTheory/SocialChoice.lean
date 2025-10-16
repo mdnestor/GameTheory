@@ -4,6 +4,8 @@ Arrow's impossibility theorem.
 
 Based on the decisive coalitions argument.
 
+Relies on Mathlib some. The main heavy lifter is `exists_minimal_of_wellFoundedLT` which says that a well founded relation has a minimal element.
+
 TODO:
 - better factorization of existence lemmas
 - maybe just refer to the coalitions as finsets
@@ -12,14 +14,12 @@ TODO:
 -/
 
 import Mathlib.Data.Set.Finite.Basic
-import Mathlib.Order.Minimal
 import Mathlib.Order.SetNotation
+import Mathlib.Order.Minimal
 
-set_option linter.unusedVariables false
+variable {I X Y: Type*}
 
-variable {I X: Type*}
-
-class Pref {X: Type*} (R: X → X → Prop): Prop where
+class Pref (R: X → X → Prop): Prop where
   reflexive: Reflexive R
   transitive: Transitive R
   total: Total R
@@ -34,12 +34,11 @@ def strict (R: X → X → Prop): X → X → Prop :=
   fun x y => R x y ∧ ¬ R y x
 
 theorem strict_transitive {R: X → X → Prop} (h: Transitive R): Transitive (strict R) := by
-  intro x y z ⟨lexy, nleyx⟩ ⟨leyz, nlezy⟩
-  have lexz := h lexy leyz
-  have nlezx: ¬ R z x := by
-    intro lezx
-    exact nleyx (h leyz lezx)
-  exact ⟨lexz, nlezx⟩
+  intro _ _ _ h1 h2
+  constructor
+  exact h h1.1 h2.1
+  intro h3
+  exact h1.2 (h h2.1 h3)
 
 def decisive_over (F: (I → Prefs X) → Prefs X) (C: Set I) (x y: X): Prop :=
   ∀ π, (∀ i ∈ C, strict (π i) x y) → strict (F π) x y
@@ -56,9 +55,9 @@ def dictatorship (F: (I → Prefs X) → Prefs X): Prop :=
 def pareto (F: (I → Prefs X) → Prefs X): Prop :=
   ∀ π x y, (∀ i, strict (π i) x y) → strict (F π) x y
 
-theorem univ_decisive {F: (I → Prefs X) → Prefs X} (h: pareto F): decisive F Set.univ := by
-  intro x y π h1
-  exact h π x y fun i => h1 i trivial
+theorem pareto_univ_decisive {F: (I → Prefs X) → Prefs X} (h: pareto F): decisive F Set.univ := by
+  simp [decisive, decisive_over]
+  exact fun x y p => h p x y
 
 theorem singleton_pareto_dictator [Subsingleton I] {F: (I → Prefs X) → Prefs X} (h: pareto F) (i: I): dictator F i := by
    intro x y π hi
@@ -81,49 +80,44 @@ theorem decisive_over_weak_decisive_over {F: (I → Prefs X) → Prefs X} {C: Se
 def iia (F: (I → Prefs X) → Prefs X): Prop :=
   ∀ π1 π2 x y, (∀ i, π1 i x y ↔ π2 i x y) → (F π1 x y ↔ F π2 x y)
 
-theorem iia_strict {F: (I → Prefs X) → Prefs X} (hF: iia F) {π π': I → Prefs X} {x z : X}
-  (hxz: ∀ i, π i x z ↔ π' i x z) (hzx: ∀ i, π i z x ↔ π' i z x):
-  strict (F π) x z ↔ strict (F π') x z := by
-  have Hxz: (F π) x z ↔ (F π') x z := hF π π' x z hxz
-  have Hzx: (F π) z x ↔ (F π') z x := hF π π' z x hzx
-  simp [strict, Hxz, Hzx]
+theorem iia_strict {F: (I → Prefs X) → Prefs X} (hF: iia F) {π π': I → Prefs X} {x y: X}
+  (hxy: ∀ i, π i x y ↔ π' i x y) (hyx: ∀ i, π i y x ↔ π' i y x):
+  strict (F π) x y ↔ strict (F π') x y := by
+  simp [strict, hF π π' x y hxy, hF π π' y x hyx]
 
-def pullback {X Y: Type*} (f: X → Y) (R: Y → Y → Prop): X → X → Prop :=
+def pullback (f: X → Y) (R: Y → Y → Prop): X → X → Prop :=
   fun x y => R (f x) (f y)
 
-theorem pullback_pref {X Y: Type*} {R: Y → Y → Prop} (h: Pref R) (f: X → Y): Pref (pullback f R) := {
+theorem pullback_pref {R: Y → Y → Prop} (h: Pref R) (f: X → Y): Pref (pullback f R) := {
   reflexive := fun x => h.reflexive (f x)
   transitive := fun _ _ _ h1 h2 => h.transitive h1 h2
   total := fun x y => h.total (f x) (f y)
 }
 
-def rank_pref (r: X → Nat): Pref (fun a b => r a ≤ r b) := {
+def rank_pref (r: X → Nat): Pref (pullback r Nat.le) := {
   reflexive := fun x => Nat.le_refl (r x)
   transitive := fun _ _ _ => Nat.le_trans
   total := fun x y => Nat.le_total (r x) (r y)
 }
 
-def modify_relation_between [DecidableEq X] (R: X → X → Prop) (x y z : X): X → X → Prop :=
+def modify_relation_between [DecidableEq X] (x y z: X): X → X → Prop :=
   let r: X → Nat := fun a => if a = x then 0 else if a = y then 1 else if a = z then 2 else 0
   pullback r (Nat.le)
 
-def modify_relation_below [DecidableEq X] (R: X → X → Prop) (x y z : X): X → X → Prop :=
+def modify_relation_below [DecidableEq X] (R: X → X → Prop) (y: X): X → X → Prop :=
   fun a b => if a = y then True else if b = y then False else R a b
 
-def modify_relation_above [DecidableEq X] (R: X → X → Prop) (x y z : X): X → X → Prop :=
+def modify_relation_above [DecidableEq X] (R: X → X → Prop) (y: X): X → X → Prop :=
   fun a b => if b = y then True else if a = y then False else R a b
 
-theorem modify_pref (p: Prefs X) (x y z : X) (hxy : x ≠ y) (hxz : x ≠ z) (hyz : y ≠ z) (h : strict p x z):
-  ∃ p' : Prefs X, (p x z ↔ p' x z) ∧ (p z x ↔ p' z x) ∧ strict p' x y ∧ strict p' y z := by
-  classical
+theorem modify_pref [DecidableEq X] (p: Prefs X) {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z) (h: strict p x z):
+  ∃ p': Prefs X, (p x z ↔ p' x z) ∧ (p z x ↔ p' z x) ∧ strict p' x y ∧ strict p' y z := by
   let r: X → Nat := fun a => if a = x then 0 else if a = y then 1 else if a = z then 2 else 0
-  let pref := rank_pref r
-  exists ⟨fun a b => r a ≤ r b, rank_pref r⟩
-  simp_all [r, strict, Ne.symm hxy, Ne.symm hyz, Ne.symm hxz]
+  exists ⟨pullback r Nat.le, rank_pref r⟩
+  simp_all [r, strict, pullback, Ne.symm hxy, Ne.symm hyz, Ne.symm hxz]
 
-theorem modify_pref' (p: Prefs X) (x y z : X) (hxy : x ≠ y) (hxz : x ≠ z) (hyz : y ≠ z):
-  ∃ p' : Prefs X, (p x z ↔ p' x z) ∧ (p z x ↔ p' z x) ∧ strict p' y x ∧ strict p' y z := by
-  classical
+theorem modify_pref' [DecidableEq X] (p: Prefs X) {x y z: X} (hxy: x ≠ y) (hyz: y ≠ z):
+  ∃ p': Prefs X, (p x z ↔ p' x z) ∧ (p z x ↔ p' z x) ∧ strict p' y x ∧ strict p' y z := by
   let p': X → X → Prop := fun a b => if a = y then
     True
   else if b = y then
@@ -147,9 +141,8 @@ theorem modify_pref' (p: Prefs X) (x y z : X) (hxy : x ≠ y) (hxz : x ≠ z) (h
   use ⟨p', this⟩
   simp_all [p', strict, Ne.symm hyz]
 
-theorem modify_pref'' (p: Prefs X) (x y z : X) (hxy : x ≠ y) (hxz : x ≠ z) (hyz : y ≠ z):
-  ∃ p' : Prefs X, (p x z ↔ p' x z) ∧ (p z x ↔ p' z x) ∧ strict p' x y ∧ strict p' z y := by
-  classical
+theorem modify_pref'' [DecidableEq X] (p: Prefs X) {x y z: X} (hxy: x ≠ y) (hyz: y ≠ z):
+  ∃ p': Prefs X, (p x z ↔ p' x z) ∧ (p z x ↔ p' z x) ∧ strict p' x y ∧ strict p' z y := by
   let p': X → X → Prop := fun a b => if b = y then
     True
   else if a = y then
@@ -174,69 +167,64 @@ theorem modify_pref'' (p: Prefs X) (x y z : X) (hxy : x ≠ y) (hxz : x ≠ z) (
   simp_all [p', strict, Ne.symm hyz]
 
 theorem exists_modified_profile
-  (π : I → Prefs X)
-  {x y z : X}
-  (hxy : x ≠ y) (hxz : x ≠ z) (hyz : y ≠ z)
-  {C : Set I}
-  (h : ∀ i ∈ C, strict (π i) x z) :
-  ∃ π' : I → Prefs X, ∀ i,
-    ((π i) x z ↔ (π' i) x z) ∧
-    ((π i) z x ↔ (π' i) z x) ∧
+  [DecidableEq X] (π: I → Prefs X)
+  {x y z: X}
+  (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z)
+  {C: Set I}
+  [∀ i, Decidable (i ∈ C)]
+  (h: ∀ i ∈ C, strict (π i) x z) :
+  ∃ π': I → Prefs X, ∀ i,
+    (π i x z ↔ π' i x z) ∧
+    (π i z x ↔ π' i z x) ∧
     (i ∈ C → strict (π' i) x y ∧ strict (π' i) y z) ∧
     (i ∉ C → strict (π' i) y x ∧ strict (π' i) y z) := by
-  classical
   use fun i => if hi: i ∈ C then
-    (modify_pref (π i) x y z hxy hxz hyz (h i hi)).choose
+    (modify_pref (π i) hxy hxz hyz (h i hi)).choose
   else
-    (modify_pref' (π i) x y z hxy hxz hyz).choose
+    (modify_pref' (π i) hxy hyz).choose
   intro i
-  by_cases hi: i ∈ C
-  simp [hi]
-  exact (modify_pref (π i) x y z hxy hxz hyz (h i hi)).choose_spec
-  simp [hi]
-  exact (modify_pref' (π i) x y z hxy hxz hyz).choose_spec
+  by_cases hi: i ∈ C <;> simp [hi]
+  exact (modify_pref (π i) hxy hxz hyz (h i hi)).choose_spec
+  exact (modify_pref' (π i) hxy hyz).choose_spec
 
 theorem exists_modified_profile'
-  (π : I → Prefs X)
-  {x y z : X}
-  (hxy : x ≠ y) (hxz : x ≠ z) (hyz : y ≠ z)
-  {C : Set I}
-  (h : ∀ i ∈ C, strict (π i) x z) :
-  ∃ π' : I → Prefs X, ∀ i,
+  [DecidableEq X]
+  (π: I → Prefs X)
+  {x y z: X}
+  (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z)
+  {C: Set I}
+  [∀ i, Decidable (i ∈ C)]
+  (h: ∀ i ∈ C, strict (π i) x z) :
+  ∃ π': I → Prefs X, ∀ i,
     ((π i) x z ↔ (π' i) x z) ∧
     ((π i) z x ↔ (π' i) z x) ∧
     (i ∈ C → strict (π' i) x y ∧ strict (π' i) y z) ∧
     (i ∉ C → strict (π' i) x y ∧ strict (π' i) z y) := by
-  classical
   use fun i => if hi: i ∈ C then
-    (modify_pref (π i) x y z hxy hxz hyz (h i hi)).choose
+    (modify_pref (π i) hxy hxz hyz (h i hi)).choose
   else
-    (modify_pref'' (π i) x y z hxy hxz hyz).choose
+    (modify_pref'' (π i) hxy hyz).choose
   intro i
-  by_cases hi: i ∈ C
-  simp [hi]
-  exact (modify_pref (π i) x y z hxy hxz hyz (h i hi)).choose_spec
-  simp [hi]
-  exact (modify_pref'' (π i) x y z hxy hxz hyz).choose_spec
+  by_cases hi: i ∈ C <;> simp [hi]
+  exact (modify_pref (π i) hxy hxz hyz (h i hi)).choose_spec
+  exact (modify_pref'' (π i) hxy hyz).choose_spec
 
-theorem exists_acyclic_pref {x y z : X}
-  (hxy : x ≠ y) (hxz : x ≠ z) (hyz : y ≠ z):
+theorem exists_acyclic_pref [DecidableEq X] {x y z: X}
+  (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z):
   ∃ p: Prefs X, strict p x y ∧ strict p y z := by
-  classical
   let r: X → Nat := fun a => if a = x then 0 else if a = y then 1 else if a = z then 2 else 0
   let pref := rank_pref r
-  exists ⟨fun a b => r a ≤ r b, rank_pref r⟩
-  simp_all [r, strict, Ne.symm hxy, Ne.symm hyz, Ne.symm hxz]
+  exists ⟨pullback r Nat.le, rank_pref r⟩
+  simp_all [r, strict, pullback, Ne.symm hxy, Ne.symm hyz, Ne.symm hxz]
 
 theorem exists_condorcet_profile
-  {x y z : X}
-  (hxy : x ≠ y) (hxz : x ≠ z) (hyz : y ≠ z)
+  [DecidableEq X] {x y z: X}
+  (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z)
   (c: I → Fin 3):
-  ∃ π : I → Prefs X, ∀ i,
+  ∃ π: I → Prefs X, ∀ i,
     (c i = 0 → strict (π i) x y ∧ strict (π i) y z) ∧
     (c i = 1 → strict (π i) y z ∧ strict (π i) z x) ∧
     (c i = 2 → strict (π i) z x ∧ strict (π i) x y) := by
-  classical
   use fun i => match c i with
   | 0 => (exists_acyclic_pref hxy hxz hyz).choose
   | 1 => (exists_acyclic_pref hyz (Ne.symm hxy) (Ne.symm hxz)).choose
@@ -274,14 +262,14 @@ theorem tripartition_lemma {I: Type*} {A B C: Set I} (h: tripartition A B C):
   exact this trivial
 
 theorem exists_condorcet_profile'
-  {x y z : X}
-  (hxy : x ≠ y) (hxz : x ≠ z) (hyz : y ≠ z)
-  {A B C: Set I} (hAB: A ∩ B = ∅) (hAC: A ∩ C = ∅) (hBC: B ∩ C = ∅) (hABC: A ∪ B ∪ C = Set.univ):
-  ∃ π : I → Prefs X, ∀ i,
+  [DecidableEq X] {x y z: X}
+  (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z)
+  {A B C: Set I} [∀ i, Decidable (i ∈ A)] [∀ i, Decidable (i ∈ B)]
+  (hAB: A ∩ B = ∅) (hAC: A ∩ C = ∅) (hBC: B ∩ C = ∅) (hABC: A ∪ B ∪ C = Set.univ):
+  ∃ π: I → Prefs X, ∀ i,
     (i ∈ A → strict (π i) x y ∧ strict (π i) y z) ∧
     (i ∈ B → strict (π i) y z ∧ strict (π i) z x) ∧
     (i ∈ C → strict (π i) z x ∧ strict (π i) x y) := by
-  classical
   let c: I → Fin 3 := fun i =>
     if i ∈ A then 0 else if i ∈ B then 1 else 2
   have: ∀ i, (i ∈ A ↔ c i = 0) ∧ (i ∈ B ↔ c i = 1) ∧ (i ∈ C ↔ c i = 2) := by
@@ -304,7 +292,9 @@ theorem exists_condorcet_profile'
   exists π
   simp_all
 
-theorem decisive_spread_forward {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z) {F: (I → Prefs X) → Prefs X} (hF: pareto F) (hF2: iia F) {C: Set I} (h: weak_decisive_over F C x y): decisive_over F C x z := by
+theorem decisive_spread_forward [DecidableEq X] {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z)
+  {F: (I → Prefs X) → Prefs X} (hF: pareto F) (hF2: iia F) {C: Set I} [∀ i, Decidable (i ∈ C)]
+  (h: weak_decisive_over F C x y): decisive_over F C x z := by
   intro π h1
   obtain ⟨π', hπ'⟩ := exists_modified_profile π hxy hxz hyz h1
   let h2 := fun i => (hπ' i).1
@@ -325,8 +315,8 @@ theorem decisive_spread_forward {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y
     · exact (h4 i hi).right
     · exact (h5 i hi).right
 
-theorem decisive_spread_backward {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z)
-  {F: (I → Prefs X) → Prefs X} (hF: pareto F) (hF2: iia F) {C: Set I}
+theorem decisive_spread_backward [DecidableEq X] {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z)
+  {F: (I → Prefs X) → Prefs X} (hF: pareto F) (hF2: iia F) {C: Set I} [∀ i, Decidable (i ∈ C)]
   (h: weak_decisive_over F C x y): decisive_over F C z y := by
   intro π h1
   have hzx: z ≠ x := Ne.symm hxz
@@ -350,8 +340,8 @@ theorem decisive_spread_backward {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: 
     · intro i hi
       exact (h5 i hi).right
 
-theorem decisive_spread_symmetric {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z)
-  {F: (I → Prefs X) → Prefs X} (hF: pareto F) (hF2: iia F) {C: Set I}
+theorem decisive_spread_symmetric [DecidableEq X] {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z)
+  {F: (I → Prefs X) → Prefs X} (hF: pareto F) (hF2: iia F) {C: Set I} [∀ i, Decidable (i ∈ C)]
   (h: weak_decisive_over F C x y): decisive_over F C y x := by
   have := decisive_spread_forward hxy hxz hyz hF hF2 h
   have := decisive_over_weak_decisive_over this
@@ -359,24 +349,19 @@ theorem decisive_spread_symmetric {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz:
   have := decisive_over_weak_decisive_over this
   exact decisive_spread_forward hyz (Ne.symm hxy) (Ne.symm hxz) hF hF2 this
 
-theorem decisive_spread_strengthen {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z)
-  {F: (I → Prefs X) → Prefs X} (hF: pareto F) (hF2: iia F) {C: Set I}
+theorem decisive_spread_strengthen [DecidableEq X] {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z)
+  {F: (I → Prefs X) → Prefs X} (hF: pareto F) (hF2: iia F) {C: Set I} [∀ i, Decidable (i ∈ C)]
   (h: weak_decisive_over F C x y): decisive_over F C x y := by
-  have := decisive_spread_symmetric hxy hxz hyz hF hF2 h
-  have := decisive_over_weak_decisive_over this
-  exact decisive_spread_symmetric (Ne.symm hxy) hyz hxz hF hF2 this
+  apply decisive_spread_symmetric (Ne.symm hxy) hyz hxz hF hF2
+  apply decisive_over_weak_decisive_over
+  exact decisive_spread_symmetric hxy hxz hyz hF hF2 h
 
 theorem decisive_over_refl (F: (I → Prefs X) → Prefs X) {C: Set I}
   (hC: Nonempty C) (x: X): decisive_over F C x x := by
-  simp [decisive_over]
-  intro π
-  have i: C := Classical.ofNonempty
-  intro h
-  have := h i i.prop
-  simp_all [strict]
+  simp_all [decisive_over, strict]
 
-theorem decisive_spread {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z)
-  {F: (I → Prefs X) → Prefs X} (hF: pareto F) (hF2: iia F) {C: Set I} (hC: Nonempty C)
+theorem decisive_spread [DecidableEq X] {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z)
+  {F: (I → Prefs X) → Prefs X} (hF: pareto F) (hF2: iia F) {C: Set I} [∀ i, Decidable (i ∈ C)] (hC: Nonempty C)
   (h: weak_decisive_over F C x y): decisive F C := by
   intro s t
   by_cases h1: s = t
@@ -404,10 +389,6 @@ def exists_nonempty_decisive_of_size [Fintype I] [∀ C: Set I, ∀ i, Decidable
   (F: (I → Prefs X) → Prefs X) (n: Nat): Prop :=
   ∃ C, C.Nonempty ∧ decisive F C ∧ Fintype.card C = n
 
-theorem pareto_univ_decisive {F: (I → Prefs X) → Prefs X} (h: pareto F): decisive F Set.univ := by
-  simp [decisive, decisive_over]
-  exact fun x y p => h p x y
-
 theorem exists_minimal_decisive_coalition [Nonempty I] [Fintype I] [∀ C: Set I, ∀ i, Decidable (i ∈ C)]
   {F: (I → Prefs X) → Prefs X} (h: pareto F): ∃ n, Minimal (exists_nonempty_decisive_of_size F) n := by
   apply exists_minimal_of_wellFoundedLT
@@ -418,14 +399,15 @@ theorem exists_minimal_decisive_coalition [Nonempty I] [Fintype I] [∀ C: Set I
   exact pareto_univ_decisive h
   exact Fintype.card_setUniv
 
-theorem decisive_contraction_lemma {I X : Type*}
+theorem decisive_contraction_lemma [DecidableEq X]
   {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z)
-  {A B C: Set I} (hC11 : Set.Nonempty A) (hABC: tripartition A B C)
-  {F: (I → Prefs X) → Prefs X} (hF2 : pareto F) (hF3 : iia F)
-  {π₀ : I → Prefs X}
-  (hA : ∀ i ∈ A, strict (π₀ i) x y ∧ strict (π₀ i) y z)
-  (hB : ∀ i ∈ B, strict (π₀ i) y z ∧ strict (π₀ i) z x)
-  (hC : ∀ i ∈ C, strict (π₀ i) z x ∧ strict (π₀ i) x y)
+  {A B C: Set I} [∀ i, Decidable (i ∈ A)]
+  (hC11: Set.Nonempty A) (hABC: tripartition A B C)
+  {F: (I → Prefs X) → Prefs X} (hF2: pareto F) (hF3: iia F)
+  {π₀: I → Prefs X}
+  (hA: ∀ i ∈ A, strict (π₀ i) x y ∧ strict (π₀ i) y z)
+  (hB: ∀ i ∈ B, strict (π₀ i) y z ∧ strict (π₀ i) z x)
+  (hC: ∀ i ∈ C, strict (π₀ i) z x ∧ strict (π₀ i) x y)
   (h6: strict (F π₀) x z):
   decisive F A := by
   apply decisive_spread hxz hxy (Ne.symm hyz) hF2 hF3
@@ -468,7 +450,7 @@ theorem decisive_contraction_lemma {I X : Type*}
   rw [←this]
   exact h6
 
-theorem decisive_contraction [Fintype I] [∀ C: Set I, ∀ i, Decidable (i ∈ C)]
+theorem decisive_contraction [DecidableEq X] [Fintype I] [∀ C: Set I, ∀ i, Decidable (i ∈ C)]
   (h0: ∃ x y z: X, x ≠ y ∧ x ≠ z ∧ y ≠ z) {F: (I → Prefs X) → Prefs X} {C: Set I}
   (h1: decisive F C) (h2: 2 ≤ Fintype.card C) (hF2: pareto F) (hF3: iia F):
   ∃ A, A.Nonempty ∧ A < C ∧ decisive F A := by
@@ -536,16 +518,16 @@ theorem decisive_contraction [Fintype I] [∀ C: Set I, ∀ i, Decidable (i ∈ 
     by_cases i ∈ A <;> simp_all [A, B]
   have h6': strict (F π₀) z y := by
     rcases this with ⟨hxy, n_yx⟩
-    have hzx : (F π₀) z x := by
+    have hzx: (F π₀) z x := by
       rcases (F π₀).property.total x z with hxz | hzx
-      · have : ¬¬ (F π₀) z x := by
+      · have: ¬¬ (F π₀) z x := by
           intro hn; exact h6 ⟨hxz, hn⟩
         exact not_not.mp this
       · exact hzx
-    have pzy : (F π₀) z y := (F π₀).property.transitive hzx hxy
-    have n_yz : ¬ (F π₀) y z := by
+    have pzy: (F π₀) z y := (F π₀).property.transitive hzx hxy
+    have n_yz: ¬ (F π₀) y z := by
       intro hyz
-      have hyx : (F π₀) y x := (F π₀).property.transitive hyz hzx
+      have hyx: (F π₀) y x := (F π₀).property.transitive hyz hzx
       exact n_yx hyx
     exact ⟨pzy, n_yz⟩
 
@@ -553,7 +535,7 @@ theorem decisive_contraction [Fintype I] [∀ C: Set I, ∀ i, Decidable (i ∈ 
   simp_all [A, B]
   exact decisive_contraction_lemma (Ne.symm hxz) (Ne.symm hyz) hxy B_nonempty tri' hF2 hF3 h4 h3 h5 h6'
 
-theorem decisive_minimal [Nonempty I] [Fintype I] [∀ C: Set I, ∀ i, Decidable (i ∈ C)]
+theorem decisive_minimal [DecidableEq X] [Nonempty I] [Fintype I] [∀ C: Set I, ∀ i, Decidable (i ∈ C)]
   (h0: ∃ x y z: X, x ≠ y ∧ x ≠ z ∧ y ≠ z) {F: (I → Prefs X) → Prefs X}
   (hF2: pareto F) (hF3: iia F): Minimal (exists_nonempty_decisive_of_size F) 1 := by
   obtain ⟨n, hn⟩ := exists_minimal_decisive_coalition hF2
@@ -580,9 +562,9 @@ theorem decisive_minimal [Nonempty I] [Fintype I] [∀ C: Set I, ∀ i, Decidabl
   rw [←this]
   exact hn
 
-theorem exists_dictatorship [Nonempty I] [Fintype I] (h0: ∃ x y z: X, x ≠ y ∧ x ≠ z ∧ y ≠ z)
-  [∀ C: Set I, ∀ i, Decidable (i ∈ C)] {F: (I → Prefs X) → Prefs X} (h1: pareto F) (h2: iia F) {C: Set I} (h3: 2 ≤ Fintype.card C)
-  (h4: decisive F C): dictatorship F := by
+theorem arrow [Fintype I] [Nonempty I] [∀ C: Set I, ∀ i, Decidable (i ∈ C)]
+  [DecidableEq X] (h0: ∃ x y z: X, x ≠ y ∧ x ≠ z ∧ y ≠ z)
+  {F: (I → Prefs X) → Prefs X} (h1: pareto F) (h2: iia F): dictatorship F := by
   obtain ⟨i, _⟩ := decisive_minimal h0 h1 h2
   obtain ⟨C, hC0, hC1, hC2⟩ := i
   have: Nonempty C := Set.Nonempty.to_subtype hC0
@@ -595,15 +577,3 @@ theorem exists_dictatorship [Nonempty I] [Fintype I] (h0: ∃ x y z: X, x ≠ y 
     (expose_names; exact (Set.Nonempty.subset_singleton_iff hC0).mp fun ⦃a⦄ a_1 => this a_1 property)
   rw [this] at hC1
   exists i
-
-theorem arrow [Fintype I] [Nonempty I] [∀ C: Set I, ∀ i, Decidable (i ∈ C)]
-  (h0: ∃ x y z: X, x ≠ y ∧ x ≠ z ∧ y ≠ z) (F: (I → Prefs X) → Prefs X)
-  (h1: pareto F) (h2: iia F): dictatorship F := by
-  by_cases h: Fintype.card I ≤ 1
-  have := Fintype.card_le_one_iff_subsingleton.mp h
-  exact singleton_pareto_dictatorship h1
-  simp [not_le] at h
-  apply exists_dictatorship h0 h1 h2
-  rw [Fintype.card_setUniv]
-  exact h
-  exact univ_decisive h1
