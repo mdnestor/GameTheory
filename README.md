@@ -2,6 +2,8 @@ A little game theory library written in Lean. Loosely based on Osborne and Rubin
 
 Currently there is no dependence on Mathlib, at the benefit of simplicity but at the cost of inability to touch the major theorems (like existence of a mixed Nash equilibrium).
 
+Contains a proof of Arrow's impossibility theorem under GameTheory/SocialChoice.
+
 ### Code samples
 
 Three versions of a normal form game:
