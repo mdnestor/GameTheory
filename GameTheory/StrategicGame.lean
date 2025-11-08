@@ -110,9 +110,9 @@ class UtilityGame (I S U: Type) where
 -- A generalization: instead of each player getting a utility,
 -- the game has some 'outcome' and the players have a preference on outcomes.
 
-class OutcomeGame (I S X: Type) where
-  play: (I → S) → X
-  pref: I → Relation X
+class OutcomeGame (I S O: Type) where
+  play: (I → S) → O
+  pref: I → Relation O
 
 -- Social choice as an example of an outcome game
 
@@ -196,7 +196,7 @@ def best_response (G: Game I S) (π: I → S) (i: I) (s: S): Prop :=
 -- A Nash equilibrium is a profile in which every player is using their best response.
 -- equivalently it is a top element in the induced Pareto relation on strategies.
 
-def nash_equilibrium (G: Game I S) (π: I → S): Prop :=
+def Game.nash_eq (G: Game I S) (π: I → S): Prop :=
   ∀ i, best_response G π i (π i)
 
 -- For a fixed player, a strategy s 'dominates' another strategy s₀ if it's always preferable to play s over s₀.
@@ -216,12 +216,12 @@ theorem dominant_iff_best_response (G: Game I S) (i: I) (s: S): dominant G i s �
 
 -- Any profile where every player is using a dominant strategy is a Nash equilibrium.
 
-theorem dominant_equilibrium {G: Game I S} {π: I → S} (h: ∀ i, dominant G i (π i)): nash_equilibrium G π := by
+theorem dominant_equilibrium {G: Game I S} {π: I → S} (h: ∀ i, dominant G i (π i)): G.nash_eq π := by
   intro p s
   exact h p s π
 
 def payoff_dominant {G: Game I S} (π: I → S): Prop :=
-  ∀ π₀, nash_equilibrium G π₀ → meet G.pref π₀ π
+  ∀ π₀, G.nash_eq π₀ → meet G.pref π₀ π
 
 example {G: Game I S}: Relation (I → S) :=
   meet G.pref
@@ -250,7 +250,7 @@ def PrisonerDilemma: UtilityGame (Fin 2) Bool (Fin 4) := {
   pref := LE.le
 }
 
-example: nash_equilibrium PrisonerDilemma.toGame (fun _ => true) := by
+example: PrisonerDilemma.toGame.nash_eq (fun _ => true) := by
   intro p s
   rw [PrisonerDilemma]
   match p with
