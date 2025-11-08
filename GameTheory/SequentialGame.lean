@@ -1,9 +1,12 @@
 
 import GameTheory.StrategicGame
 
+variable {I A X: Type} [DecidableEq I]
+
 /-
 
 A sequential game consisting of:
+
 - a set I of players
 - a set X of game states
 - a set A of possible actions (assumed the same for all players)
@@ -14,42 +17,38 @@ A sequential game consisting of:
 Some formalizations assume players take the state history as input for their decision.
 For simplicity let's just assume the state variable already contains that information.
 
+First we can define a sequential game struct which just carries the move function.
+
 -/
-
--- The sequential game struct just comes with a mapping from action profiles to state updates.
-
-variable {I A X: Type} [DecidableEq I]
 
 class SeqGameStruct (I A X: Type) where
   move: (I → A) → X → X
 
--- This is enough to define the one-step update from an initial state along with the full state sequence.
+def SeqGameStruct.step (G: SeqGameStruct I A X) (π: I → X → A) (x₀: X): X :=
+  G.move (fun p => π p x₀) x₀
 
-def SeqGameStruct.step (G: SeqGameStruct I A X) (π: I → X → A) (ε: X): X :=
-  G.move (fun p => π p ε) ε
-
-def SeqGameStruct.run (G: SeqGameStruct I A X) (π: I → X → A) (ε: X): Nat → X :=
+def SeqGameStruct.run (G: SeqGameStruct I A X) (π: I → X → A) (x₀: X): Nat → X :=
   fun n => match n with
-  | Nat.zero => ε
-  | Nat.succ prev => G.step π (G.run π ε prev)
+  | 0 => x₀
+  | p + 1 => G.step π (G.run π x₀ p)
 
--- A full sequential game comes with a preference relation on trajectories.
+-- A full sequential game comes with a preference profile on trajectories.
 
 class SeqGame (I A X: Type) extends SeqGameStruct I A X where
-  pref: I → Relation (Nat → X)
+  pref: Profile I (Nat → X)
 
 
 -- Given a sequential game and an initial state, there is a corresponding outcome game where the outcomes are trajectories.
 
-def SeqGame.toOutcomeGame (G: SeqGame I A X) (ε: X): OutcomeGame I (X → A) (Nat → X) := {
-  play := fun π => G.run π ε
+def SeqGame.toOutcomeGame (G: SeqGame I A X) (x₀: X): OutcomeGame I (X → A) (Nat → X) := {
+  play := fun π => G.run π x₀
   pref := G.pref
 }
 
 -- A subgame perfect equilibrium is a strategy profile in which every subgame is a Nash equilibrium.
 
 def SeqGame.subgame_perfect_equilibrium (G: SeqGame I A X) (π: I → X → A): Prop :=
-  ∀ ε, (G.toOutcomeGame ε).toGame.nash_eq π
+  ∀ x₀, (G.toOutcomeGame x₀).toGame.nash_eq π
 
 -- A sequential utility game in which every state comes with a utility for each players.
 -- (This is simpler than assigning utilities to transitions, in principle I think you can pack these into the state.)
@@ -65,17 +64,17 @@ class SeqUtilityGame (I A X U: Type) extends SeqGameStruct I A X where
 def hvalue (G: SeqUtilityGame I A X U) (σ: (Nat → U) → U) (h: Nat → X) (p: I): U :=
   σ (fun t => G.uvalue p (h t))
 
-def πvalue (G: SeqUtilityGame I A X U) (σ: (Nat → U) → U) (π: I → X → A) (ε: X) (p: I): U :=
-  let h := G.run π ε
+def πvalue (G: SeqUtilityGame I A X U) (σ: (Nat → U) → U) (π: I → X → A) (x₀: X) (p: I): U :=
+  let h := G.run π x₀
   hvalue G σ h p
 
--- Given a sequential utility game, an initial state ε, and a utility summing function σ,
+-- Given a sequential utility game, an initial state x₀, and a utility summing function σ,
 -- there is a corresponding utility game.
 
 @[simp]
-def SeqUtilityGame.toUtilityGame (G: SeqUtilityGame I A X U) (σ: (Nat → U) → U) (ε: X): UtilityGame I (X → A) U := {
+def SeqUtilityGame.toUtilityGame (G: SeqUtilityGame I A X U) (σ: (Nat → U) → U) (x₀: X): UtilityGame I (X → A) U := {
   play := fun π =>
-    let h := G.run π ε
+    let h := G.run π x₀
     hvalue G σ h
   pref := G.prefer
 }
@@ -87,11 +86,11 @@ Dynamic game, a nice generalization.
 
 -/
 
-class DynamicGame (I S X T: Type) [Zero T] where
+class DynamicGame (I S X T: Type) where
   play: (I → S) → T → X → X
-  pref: I → Relation (T → X)
+  pref: Profile I (T → X)
 
-variable {S T: Type} [Zero T]
+variable {S T: Type}
 
 -- Given a dynamic game, a strategy profile, and an initial state,
 -- we can "run" the game and get the corresponding state trajectory.
@@ -140,18 +139,18 @@ Theorem: if Up(s) + Vp(s0, π0) ≤ Up(s) + Vp(s1, π0) then p prefers π0 ≤ �
 def tail {U: Type} (u: Nat → U): Nat → U :=
   fun t => u (t + 1)
 
-def SeqUtilityGame.NormalForm (G: SeqUtilityGame I A X U) (σ: (Nat → U) → U) (ε: X): Game I (X → A) :=
-  (G.toUtilityGame σ ε).toOutcomeGame.toGame
+def SeqUtilityGame.NormalForm (G: SeqUtilityGame I A X U) (σ: (Nat → U) → U) (x₀: X): Game I (X → A) :=
+  (G.toUtilityGame σ x₀).toOutcomeGame.toGame
 
 example (G: SeqUtilityGame I A X U)
   (σ: (Nat → U) → U)
   (α: U → U → U)
   (h0: ∀ u: Nat → U, α (u 0) (σ (tail u)) = σ u)
-  (ε: X) (p: I) (π0 π1: I → X → A)
-  (h1: G.prefer (α (G.uvalue p ε) (πvalue G σ π0 (G.move (flip π0 ε) ε) p)) (α (G.uvalue p ε) (πvalue G σ π1 (G.move (flip π1 ε) ε) p))):
-  (G.NormalForm σ ε).pref p π0 π1 := by
+  (x₀: X) (p: I) (π0 π1: I → X → A)
+  (h1: G.prefer (α (G.uvalue p x₀) (πvalue G σ π0 (G.move (flip π0 x₀) x₀) p)) (α (G.uvalue p x₀) (πvalue G σ π1 (G.move (flip π1 x₀) x₀) p))):
+  (G.NormalForm σ x₀).pref p π0 π1 := by
   simp_all [SeqUtilityGame.NormalForm, SeqUtilityGame.toUtilityGame, UtilityGame.toOutcomeGame, OutcomeGame.toGame]
-  simp_all [πvalue, hvalue]
+  simp_all [πvalue, hvalue, Pullback]
   rw [←h0]
   rw (config := {occs := .pos [2]}) [←h0]
   simp_all [SeqGameStruct.run]
@@ -175,6 +174,6 @@ example (G: SeqUtilityGame I A X U)
 -- An arbitrary function v: X → U along with a preference on U is called a valuation for player p
 -- if maximizing v always leads to preferable trajectories.
 
--- Note: this doesn't depend on the utility at ε itself?
+-- Note: this doesn't depend on the utility at x₀ itself?
 def valuation (G: SeqGame I A X) (p: I) (Vp: X → U) (upref: Relation U): Prop :=
-  ∀ π0 π1 ε, G.pref p (G.run π0 ε) (G.run π1 ε) ↔ upref (Vp (G.step π0 ε)) (Vp (G.step π1 ε))
+  ∀ π0 π1 x₀, G.pref p (G.run π0 x₀) (G.run π1 x₀) ↔ upref (Vp (G.step π0 x₀)) (Vp (G.step π1 x₀))
