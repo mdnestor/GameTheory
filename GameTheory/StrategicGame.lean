@@ -1,22 +1,22 @@
 
 variable {I X Y: Type}
 
-def Endorelation (X: Type u): Type u :=
+def Relation (X: Type u): Type u :=
   X → X → Prop
 
-def reflexive (R: Endorelation X): Prop :=
+def reflexive (R: Relation X): Prop :=
   ∀ x, R x x
 
-def antisymmetric (R: Endorelation X): Prop :=
+def antisymmetric (R: Relation X): Prop :=
   ∀ x y, R x y → R y x → x = y
 
-def top (R: Endorelation X) (x: X): Prop :=
+def top (R: Relation X) (x: X): Prop :=
   ∀ x₀, R x₀ x
 
-def strict (R: Endorelation X): Endorelation X :=
+def strict (R: Relation X): Relation X :=
   fun x y => R x y ∧ ¬ R y x
 
-def strict_top (R: Endorelation X) (x: X): Prop :=
+def strict_top (R: Relation X) (x: X): Prop :=
   ∀ x₀, x ≠ x₀ → R x₀ x
 
 /-
@@ -28,7 +28,7 @@ In game theory terms this is the 'Pareto improvement' relation.
 -/
 
 @[simp]
-def meet (π: I → Endorelation X): Endorelation X :=
+def meet (π: I → Relation X): Relation X :=
   fun x y => ∀ i, π i x y
 
 /-
@@ -40,21 +40,21 @@ Two important operations on endorelations:
 -/
 
 @[simp]
-def pullback (R: Endorelation Y) (f: X → Y): Endorelation X :=
+def pullback (R: Relation Y) (f: X → Y): Relation X :=
   fun x₁ x₂ => R (f x₁) (f x₂)
 
 @[simp]
-def pullback_eval (R: Endorelation Y) (x: X): Endorelation (X → Y) :=
+def pullback_eval (R: Relation Y) (x: X): Relation (X → Y) :=
   pullback R (fun f => f x)
 
 -- An outcome is Pareto efficient wrt. a preference profile if it is not strictly Pareto dominated.
 
-def pareto_efficient (π: I → Endorelation X) (x: X): Prop :=
+def pareto_efficient (π: I → Relation X) (x: X): Prop :=
   ∀ x₁, ¬ strict (meet π) x x₁
 
 -- A preference profile is called 'zero-sum' if preferences are flipped between different players.
 
-def zero_sum (π: I → Endorelation X): Prop :=
+def zero_sum (π: I → Relation X): Prop :=
   ∀ i j x y, i ≠ j → (π i x y ↔ π j y x)
 
 /-
@@ -70,7 +70,7 @@ Proof:
 
 -/
 
-theorem zero_sum_pareto_efficient {π: I → Endorelation X} (h1: zero_sum π) (h2: ∀ i, reflexive (π i)) (h3: ∀ i, antisymmetric (π i)) (h4: ∀ i: I, ∃ j, i ≠ j): ∀ x, pareto_efficient π x := by
+theorem zero_sum_pareto_efficient {π: I → Relation X} (h1: zero_sum π) (h2: ∀ i, reflexive (π i)) (h3: ∀ i, antisymmetric (π i)) (h4: ∀ i: I, ∃ j, i ≠ j): ∀ x, pareto_efficient π x := by
   intro π π' h5
   simp_all [strict]
   rcases h5.2 with ⟨i, hi1⟩
@@ -105,19 +105,19 @@ variable {S U: Type}
 
 class UtilityGame (I S U: Type) where
   play: (I → S) → (I → U)
-  pref: Endorelation U
+  pref: Relation U
 
 -- A generalization: instead of each player getting a utility,
 -- the game has some 'outcome' and the players have a preference on outcomes.
 
 class OutcomeGame (I S X: Type) where
   play: (I → S) → X
-  pref: I → Endorelation X
+  pref: I → Relation X
 
 -- Social choice as an example of an outcome game
 
-example (pref: I → Endorelation X) (F: (I → Endorelation X) → Endorelation X):
-  OutcomeGame I (Endorelation X) (Endorelation X) := {
+example (pref: I → Relation X) (F: (I → Relation X) → Relation X):
+  OutcomeGame I (Relation X) (Relation X) := {
   play := F
   pref := fun i p₁ p₂ => ∀ x y, pref i x y → p₁ x y → p₂ x y
 }
@@ -135,7 +135,7 @@ def UtilityGame.toOutcomeGame (G: UtilityGame I S U): OutcomeGame I S (I → U) 
 -- Instead, the players can have preferences directly on strategy profiles.
 
 class Game (I S: Type) where
-  pref: I → Endorelation (I → S)
+  pref: I → Relation (I → S)
 
 
 -- This is actually an equivalent representation because we can treat the strategy profiles themselves as outcomes.
@@ -184,7 +184,7 @@ def update (π: I → S) (i₀: I) (s₀: S): I → S :=
 -- i.e. what they would rather do assuming everyone else is fixed.
 
 @[simp]
-def strategy_pref (G: Game I S) (π: I → S): I → Endorelation S :=
+def strategy_pref (G: Game I S) (π: I → S): I → Relation S :=
   fun i => pullback (G.pref i) (update π i)
 
 -- Given a fixed strategy profile, a strategy is called a player's 'best response'
@@ -202,7 +202,7 @@ def nash_equilibrium (G: Game I S) (π: I → S): Prop :=
 -- For a fixed player, a strategy s 'dominates' another strategy s₀ if it's always preferable to play s over s₀.
 -- The strategy s is called 'dominant' if it dominates all other strategies.
 
-def dominates (G: Game I S) (i: I): Endorelation S :=
+def dominates (G: Game I S) (i: I): Relation S :=
   meet (fun π => strategy_pref G π i)
 
 def dominant (G: Game I S) (i: I) (s: S): Prop :=
@@ -223,7 +223,7 @@ theorem dominant_equilibrium {G: Game I S} {π: I → S} (h: ∀ i, dominant G i
 def payoff_dominant {G: Game I S} (π: I → S): Prop :=
   ∀ π₀, nash_equilibrium G π₀ → meet G.pref π₀ π
 
-example {G: Game I S}: Endorelation (I → S) :=
+example {G: Game I S}: Relation (I → S) :=
   meet G.pref
 
 
@@ -261,7 +261,7 @@ example: nash_equilibrium PrisonerDilemma.toGame (fun _ => true) := by
 -- Given a preference, there is the associated "strict" preference, along with all the associated notions
 
 
-def strict_strategy_pref (G: Game I S) (π: I → S) (p: I): Endorelation S :=
+def strict_strategy_pref (G: Game I S) (π: I → S) (p: I): Relation S :=
   strict (strategy_pref G π p)
 
 def strict_best_response (G: Game I S) (π: I → S) (p: I) (s: S): Prop :=
@@ -270,7 +270,7 @@ def strict_best_response (G: Game I S) (π: I → S) (p: I) (s: S): Prop :=
 def strict_nash_equilibrium (G: Game I S) (π: I → S): Prop :=
   ∀ p, strict_best_response G π p (π p)
 
-def strict_dominates (G: Game I S) (p: I): Endorelation S :=
+def strict_dominates (G: Game I S) (p: I): Relation S :=
   meet (fun π => strict_strategy_pref G π p)
 
 def strict_dominant (G: Game I S) (p: I) (s: S): Prop :=

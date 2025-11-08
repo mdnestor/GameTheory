@@ -36,7 +36,7 @@ def SeqGameStruct.run (G: SeqGameStruct I E A) (π: I → E → A) (ε: E): Nat 
 -- A full sequential game comes with a preference relation on trajectories.
 
 class SeqGame (I E A: Type) extends SeqGameStruct I E A where
-  prefer: I → Endorelation (Nat → E)
+  prefer: I → Relation (Nat → E)
 
 -- Given a sequential game and an initial state, there is a corresponding outcome game where the outcomes are trajectories.
 
@@ -55,7 +55,7 @@ def subgame_perfect_equilibrium (G: SeqGame I E A) (π: I → E → A): Prop :=
 
 class SeqUtilityGame (I E A U: Type) extends SeqGameStruct I E A where
   uvalue: I → E → U
-  prefer: Endorelation U
+  prefer: Relation U
 
 -- Next we will assume we have a map σ that "sums up" the utilities along trajectories.
 -- In this case, the h-value (history value) of a trajectory is the sum of the sequence.
@@ -141,5 +141,5 @@ example (G: SeqUtilityGame I E A U)
 -- if maximizing v always leads to preferable trajectories.
 
 -- Note: this doesn't depend on the utility at ε itself?
-def valuation (G: SeqGame I E A) (p: I) (Vp: E → U) (upref: Endorelation U): Prop :=
+def valuation (G: SeqGame I E A) (p: I) (Vp: E → U) (upref: Relation U): Prop :=
   ∀ π0 π1 ε, G.prefer p (G.run π0 ε) (G.run π1 ε) ↔ upref (Vp (G.step π0 ε)) (Vp (G.step π1 ε))

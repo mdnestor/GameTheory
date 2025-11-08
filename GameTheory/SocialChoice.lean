@@ -293,7 +293,7 @@ theorem exists_condorcet_profile'
   simp_all
 
 theorem decisive_spread_forward [DecidableEq X] {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z)
-  {F: (I → Prefs X) → Prefs X} (hF: pareto F) (hF2: iia F) {C: Set I} [∀ i, Decidable (i ∈ C)]
+  {F: (I → Prefs X) → Prefs X} (hF1: pareto F) (hF2: iia F) {C: Set I} [∀ i, Decidable (i ∈ C)]
   (h: weak_decisive_over F C x y): decisive_over F C x z := by
   intro π h1
   obtain ⟨π', hπ'⟩ := exists_modified_profile π hxy hxz hyz h1
@@ -309,14 +309,14 @@ theorem decisive_spread_forward [DecidableEq X] {x y z: X} (hxy: x ≠ y) (hxz: 
       exact (h4 i hi).left
     · intro i hi
       exact (h5 i hi).left
-  · apply hF π'
+  · apply hF1 π'
     intro i
     by_cases hi: i ∈ C
     · exact (h4 i hi).right
     · exact (h5 i hi).right
 
 theorem decisive_spread_backward [DecidableEq X] {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z)
-  {F: (I → Prefs X) → Prefs X} (hF: pareto F) (hF2: iia F) {C: Set I} [∀ i, Decidable (i ∈ C)]
+  {F: (I → Prefs X) → Prefs X} (hF1: pareto F) (hF2: iia F) {C: Set I} [∀ i, Decidable (i ∈ C)]
   (h: weak_decisive_over F C x y): decisive_over F C z y := by
   intro π h1
   have hzx: z ≠ x := Ne.symm hxz
@@ -328,7 +328,7 @@ theorem decisive_spread_backward [DecidableEq X] {x y z: X} (hxy: x ≠ y) (hxz:
   let h5 := fun i => (hπ' i).2.2.2
   rw [iia_strict hF2 h2 h3]
   apply strict_transitive (F π').prop.transitive
-  · apply hF π'
+  · apply hF1 π'
     intro i
     by_cases hi: i ∈ C
     · exact (h4 i hi).left
@@ -341,49 +341,49 @@ theorem decisive_spread_backward [DecidableEq X] {x y z: X} (hxy: x ≠ y) (hxz:
       exact (h5 i hi).right
 
 theorem decisive_spread_symmetric [DecidableEq X] {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z)
-  {F: (I → Prefs X) → Prefs X} (hF: pareto F) (hF2: iia F) {C: Set I} [∀ i, Decidable (i ∈ C)]
+  {F: (I → Prefs X) → Prefs X} (hF1: pareto F) (hF2: iia F) {C: Set I} [∀ i, Decidable (i ∈ C)]
   (h: weak_decisive_over F C x y): decisive_over F C y x := by
-  have := decisive_spread_forward hxy hxz hyz hF hF2 h
+  have := decisive_spread_forward hxy hxz hyz hF1 hF2 h
   have := decisive_over_weak_decisive_over this
-  have := decisive_spread_backward hxz hxy (Ne.symm hyz) hF hF2 this
+  have := decisive_spread_backward hxz hxy (Ne.symm hyz) hF1 hF2 this
   have := decisive_over_weak_decisive_over this
-  exact decisive_spread_forward hyz (Ne.symm hxy) (Ne.symm hxz) hF hF2 this
+  exact decisive_spread_forward hyz (Ne.symm hxy) (Ne.symm hxz) hF1 hF2 this
 
 theorem decisive_spread_strengthen [DecidableEq X] {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z)
-  {F: (I → Prefs X) → Prefs X} (hF: pareto F) (hF2: iia F) {C: Set I} [∀ i, Decidable (i ∈ C)]
+  {F: (I → Prefs X) → Prefs X} (hF1: pareto F) (hF2: iia F) {C: Set I} [∀ i, Decidable (i ∈ C)]
   (h: weak_decisive_over F C x y): decisive_over F C x y := by
-  apply decisive_spread_symmetric (Ne.symm hxy) hyz hxz hF hF2
+  apply decisive_spread_symmetric (Ne.symm hxy) hyz hxz hF1 hF2
   apply decisive_over_weak_decisive_over
-  exact decisive_spread_symmetric hxy hxz hyz hF hF2 h
+  exact decisive_spread_symmetric hxy hxz hyz hF1 hF2 h
 
 theorem decisive_over_refl (F: (I → Prefs X) → Prefs X) {C: Set I}
   (hC: Nonempty C) (x: X): decisive_over F C x x := by
   simp_all [decisive_over, strict]
 
 theorem decisive_spread [DecidableEq X] {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z)
-  {F: (I → Prefs X) → Prefs X} (hF: pareto F) (hF2: iia F) {C: Set I} [∀ i, Decidable (i ∈ C)] (hC: Nonempty C)
+  {F: (I → Prefs X) → Prefs X} (hF1: pareto F) (hF2: iia F) {C: Set I} [∀ i, Decidable (i ∈ C)] (hC: Nonempty C)
   (h: weak_decisive_over F C x y): decisive F C := by
   intro s t
   by_cases h1: s = t
   subst h1
   exact decisive_over_refl F hC s
   by_cases h2: x = s <;> by_cases h3: x = t <;> by_cases h4: y = s <;> by_cases h5: y = t <;> simp_all
-  exact decisive_spread_strengthen h1 hxz hyz hF hF2 h
-  exact decisive_spread_forward hxy h1 h5 hF hF2 h
+  exact decisive_spread_strengthen h1 hxz hyz hF1 hF2 h
+  exact decisive_spread_forward hxy h1 h5 hF1 hF2 h
   subst h3 h4
-  exact decisive_spread_symmetric hxy hxz hyz hF hF2 h
+  exact decisive_spread_symmetric hxy hxz hyz hF1 hF2 h
   subst h3
-  have := decisive_spread_symmetric hxy hxz hyz hF hF2 h
+  have := decisive_spread_symmetric hxy hxz hyz hF1 hF2 h
   have := decisive_over_weak_decisive_over this
-  exact decisive_spread_backward h5 h4 h2 hF hF2 this
+  exact decisive_spread_backward h5 h4 h2 hF1 hF2 this
   subst h4
-  have := decisive_spread_symmetric h2 h3 h1 hF hF2 h
+  have := decisive_spread_symmetric h2 h3 h1 hF1 hF2 h
   have := decisive_over_weak_decisive_over this
-  exact decisive_spread_forward (fun a => h2 (Eq.symm a)) h1 h3 hF hF2 this
-  exact decisive_spread_backward h3 h2 h4 hF hF2 h
-  have := decisive_spread_forward hxy h3 h5 hF hF2 h
+  exact decisive_spread_forward (fun a => h2 (Eq.symm a)) h1 h3 hF1 hF2 this
+  exact decisive_spread_backward h3 h2 h4 hF1 hF2 h
+  have := decisive_spread_forward hxy h3 h5 hF1 hF2 h
   have := decisive_over_weak_decisive_over this
-  exact decisive_spread_backward h3 h2 (fun a => h1 (Eq.symm a)) hF hF2 this
+  exact decisive_spread_backward h3 h2 (fun a => h1 (Eq.symm a)) hF1 hF2 this
 
 def exists_nonempty_decisive_of_size [Fintype I] [∀ C: Set I, ∀ i, Decidable (i ∈ C)]
   (F: (I → Prefs X) → Prefs X) (n: Nat): Prop :=
@@ -403,14 +403,14 @@ theorem decisive_contraction_lemma [DecidableEq X]
   {x y z: X} (hxy: x ≠ y) (hxz: x ≠ z) (hyz: y ≠ z)
   {A B C: Set I} [∀ i, Decidable (i ∈ A)]
   (hC11: Set.Nonempty A) (hABC: tripartition A B C)
-  {F: (I → Prefs X) → Prefs X} (hF2: pareto F) (hF3: iia F)
+  {F: (I → Prefs X) → Prefs X} (hF1: pareto F) (hF3: iia F)
   {π₀: I → Prefs X}
   (hA: ∀ i ∈ A, strict (π₀ i) x y ∧ strict (π₀ i) y z)
   (hB: ∀ i ∈ B, strict (π₀ i) y z ∧ strict (π₀ i) z x)
   (hC: ∀ i ∈ C, strict (π₀ i) z x ∧ strict (π₀ i) x y)
   (h6: strict (F π₀) x z):
   decisive F A := by
-  apply decisive_spread hxz hxy (Ne.symm hyz) hF2 hF3
+  apply decisive_spread hxz hxy (Ne.symm hyz) hF1 hF3
   exact Set.Nonempty.to_subtype hC11
   intro π ⟨h7, h8⟩
   have h9: ∀ i ∈ A, strict (π₀ i) x z ∧ strict (π i) x z := by
@@ -537,8 +537,8 @@ theorem decisive_contraction [DecidableEq X] [Fintype I] [∀ C: Set I, ∀ i, D
 
 theorem decisive_minimal [DecidableEq X] [Nonempty I] [Fintype I] [∀ C: Set I, ∀ i, Decidable (i ∈ C)]
   (h0: ∃ x y z: X, x ≠ y ∧ x ≠ z ∧ y ≠ z) {F: (I → Prefs X) → Prefs X}
-  (hF2: pareto F) (hF3: iia F): Minimal (exists_nonempty_decisive_of_size F) 1 := by
-  obtain ⟨n, hn⟩ := exists_minimal_decisive_coalition hF2
+  (hF1 : pareto F) (hF2: iia F): Minimal (exists_nonempty_decisive_of_size F) 1 := by
+  obtain ⟨n, hn⟩ := exists_minimal_decisive_coalition hF1
   obtain ⟨C, hC0, hC1, hC2⟩ := hn.1
   have n_neq_zero: n ≠ 0 := by
     subst hC2
@@ -549,7 +549,7 @@ theorem decisive_minimal [DecidableEq X] [Nonempty I] [Fintype I] [∀ C: Set I,
     intro h
     simp at h
     rw [←hC2] at h
-    obtain ⟨C', hC3, hC4, hC5⟩ := decisive_contraction h0 hC1 h hF2 hF3
+    obtain ⟨C', hC3, hC4, hC5⟩ := decisive_contraction h0 hC1 h hF1  hF2
     have hlt_C': Fintype.card C' < Fintype.card C := Set.card_lt_card hC4
     have hlt: Fintype.card C' < n := Nat.lt_of_lt_of_eq hlt_C' hC2
     have: (exists_nonempty_decisive_of_size F) (Fintype.card ↑C') := by exists C'

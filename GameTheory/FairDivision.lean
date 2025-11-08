@@ -30,7 +30,7 @@ variable {A C P U X: Type}
 
 class Assignment (A X: Type) where
   assign: A → X
-  pref: A → Endorelation X
+  pref: A → Relation X
 
 def envy_free {A X: Type} (A: Assignment A X): Prop :=
   ∀ i j, A.pref i (A.assign j) (A.assign i)
@@ -39,7 +39,7 @@ def envy_free {A X: Type} (A: Assignment A X): Prop :=
 class UtilityAssignment (A X U: Type) where
   assign: A → X
   util: A → X → U
-  pref: Endorelation U
+  pref: Relation U
 
 def UtilityAssignment.toAssignment (A: UtilityAssignment P X U): Assignment P X := {
   assign := A.assign
@@ -60,7 +60,7 @@ def consensus (A: UtilityAssignment P X U): Prop :=
 
 class Division (A C: Type) where
   divide: C → A
-  pref: A → Endorelation (Set C)
+  pref: A → Relation (Set C)
 
 def Division.share {A C: Type} (D: Division A C) (a: A): Set C :=
   Set.preimage D.divide {a}
@@ -75,7 +75,7 @@ def Division.toAssignment (D: Division A C): Assignment A (Set C) := {
 class UtilityDivision (A C U: Type) where
   divide: C → A
   util: A → Set C → U
-  pref: Endorelation U
+  pref: Relation U
 
 def UtilityDivision.toDivision (D: UtilityDivision P C U): Division P C := {
   divide := D.divide
