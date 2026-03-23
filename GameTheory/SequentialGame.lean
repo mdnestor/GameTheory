@@ -35,27 +35,27 @@ def SeqGameStruct.run (G: SeqGameStruct I A X) (π: I → X → A) (x₀: X): Na
 -- A full sequential game comes with a preference profile on trajectories.
 
 class SeqGame (I A X: Type) extends SeqGameStruct I A X where
-  pref: Profile I (Nat → X)
+  pref: I → Rel (Nat → X)
 
 
 -- Given a sequential game and an initial state, there is a corresponding outcome game where the outcomes are trajectories.
 
-def SeqGame.toOutcomeGame (G: SeqGame I A X) (x₀: X): OutcomeGame I (X → A) (Nat → X) := {
+def SeqGame.toOutcomeGame (G: SeqGame I A X) (x₀: X): Game I (X → A) (Nat → X) := {
   play := fun π => G.run π x₀
   pref := G.pref
 }
 
 -- A subgame perfect equilibrium is a strategy profile in which every subgame is a Nash equilibrium.
 
-def SeqGame.subgame_perfect_equilibrium (G: SeqGame I A X) (π: I → X → A): Prop :=
-  ∀ x₀, (G.toOutcomeGame x₀).toGame.nash_eq π
+-- def SeqGame.subgame_perfect_equilibrium (G: SeqGame I A X) (π: I → X → A): Prop :=
+--   ∀ x₀, (G x₀).equilibrium π
 
 -- A sequential utility game in which every state comes with a utility for each players.
 -- (This is simpler than assigning utilities to transitions, in principle I think you can pack these into the state.)
 
 class SeqUtilityGame (I A X U: Type) extends SeqGameStruct I A X where
   uvalue: I → X → U
-  prefer: Relation U
+  prefer: Rel U
 
 -- Next we will assume we have a map σ that "sums up" the utilities along trajectories.
 -- In this case, the h-value (history value) of a trajectory is the sum of the sequence.
@@ -88,7 +88,7 @@ Dynamic game, a nice generalization.
 
 class DynamicGame (I S X T: Type) where
   play: (I → S) → T → X → X
-  pref: Profile I (T → X)
+  pref: I → Rel (T → X)
 
 variable {S T: Type}
 
@@ -98,15 +98,15 @@ variable {S T: Type}
 def DynamicGame.run (G: DynamicGame I S X T) (π: I → S) (x₀: X): T → X :=
   fun t => G.play π t x₀
 
--- Xvery dynamic game with a fixed initial state is an outcome game where outcomes are state trajectors T → X.
+-- Every dynamic game with a fixed initial state is an outcome game where outcomes are state trajectories T → X.
 
-instance DynamicGame.toOutcomeGame (G: DynamicGame I S X T) (x₀: X): OutcomeGame I S (T → X) := {
+instance DynamicGame.toOutcomeGame (G: DynamicGame I S X T) (x₀: X): Game I S (T → X) := {
   play := fun π => G.run π x₀
   pref := G.pref
 }
 
-def DynamicGame.subgame_perfect_equilibrium (G: DynamicGame I S X T) (π: I → S): Prop :=
-  ∀ x₀, (G.toOutcomeGame x₀).toGame.nash_eq π
+-- def DynamicGame.subgame_perfect_equilibrium (G: DynamicGame I S X T) (π: I → S): Prop :=
+--   ∀ x₀, (G x₀).equilibrium π
 
 -- Every sequential game is a dynamic game with T = ℕ.
 
@@ -136,37 +136,37 @@ Theorem: if Up(s) + Vp(s0, π0) ≤ Up(s) + Vp(s1, π0) then p prefers π0 ≤ �
 
 -/
 
-def tail {U: Type} (u: Nat → U): Nat → U :=
-  fun t => u (t + 1)
+-- def tail {U: Type} (u: Nat → U): Nat → U :=
+--   fun t => u (t + 1)
 
-def SeqUtilityGame.NormalForm (G: SeqUtilityGame I A X U) (σ: (Nat → U) → U) (x₀: X): Game I (X → A) :=
-  (G.toUtilityGame σ x₀).toOutcomeGame.toGame
+-- def SeqUtilityGame.NormalForm (G: SeqUtilityGame I A X U) (σ: (Nat → U) → U) (x₀: X): Game I (X → A) :=
+--   (G.toUtilityGame σ x₀).toOutcomeGame.toGame
 
-example (G: SeqUtilityGame I A X U)
-  (σ: (Nat → U) → U)
-  (α: U → U → U)
-  (h0: ∀ u: Nat → U, α (u 0) (σ (tail u)) = σ u)
-  (x₀: X) (p: I) (π0 π1: I → X → A)
-  (h1: G.prefer (α (G.uvalue p x₀) (πvalue G σ π0 (G.move (flip π0 x₀) x₀) p)) (α (G.uvalue p x₀) (πvalue G σ π1 (G.move (flip π1 x₀) x₀) p))):
-  (G.NormalForm σ x₀).pref p π0 π1 := by
-  simp_all [SeqUtilityGame.NormalForm, SeqUtilityGame.toUtilityGame, UtilityGame.toOutcomeGame, OutcomeGame.toGame]
-  simp_all [πvalue, hvalue, Pullback]
-  rw [←h0]
-  rw (config := {occs := .pos [2]}) [←h0]
-  simp_all [SeqGameStruct.run]
-  -- obnoxious lemma
-  have {X Y: Type} {a b c d x: X} {f: X → X → Y} {g: Y → Y → Prop} (h1: g (f x a) (f x b)) (h2: a = c) (h3: b = d): g (f x c) (f x d) := by
-    rw [←h2, ←h3]
-    exact h1
-  apply this h1 <;> (
-    congr
-    ext t
-    simp [tail, SeqGameStruct.run]
-    congr
-    induction t with
-    | zero => simp [SeqGameStruct.run]; rfl
-    | succ previous ih => simp [SeqGameStruct.run, ih]
-  )
+-- example (G: SeqUtilityGame I A X U)
+--   (σ: (Nat → U) → U)
+--   (α: U → U → U)
+--   (h0: ∀ u: Nat → U, α (u 0) (σ (tail u)) = σ u)
+--   (x₀: X) (p: I) (π0 π1: I → X → A)
+--   (h1: G.prefer (α (G.uvalue p x₀) (πvalue G σ π0 (G.move (flip π0 x₀) x₀) p)) (α (G.uvalue p x₀) (πvalue G σ π1 (G.move (flip π1 x₀) x₀) p))):
+--   (G.NormalForm σ x₀).pref p π0 π1 := by
+--   simp_all [SeqUtilityGame.NormalForm, SeqUtilityGame.toUtilityGame, UtilityGame.toOutcomeGame, OutcomeGame.toGame]
+--   simp_all [πvalue, hvalue, Pullback]
+--   rw [←h0]
+--   rw (config := {occs := .pos [2]}) [←h0]
+--   simp_all [SeqGameStruct.run]
+--   -- obnoxious lemma
+--   have {X Y: Type} {a b c d x: X} {f: X → X → Y} {g: Y → Y → Prop} (h1: g (f x a) (f x b)) (h2: a = c) (h3: b = d): g (f x c) (f x d) := by
+--     rw [←h2, ←h3]
+--     exact h1
+--   apply this h1 <;> (
+--     congr
+--     ext t
+--     simp [tail, SeqGameStruct.run]
+--     congr
+--     induction t with
+--     | zero => simp [SeqGameStruct.run]; rfl
+--     | succ previous ih => simp [SeqGameStruct.run, ih]
+--   )
 
 -- TODO: definition of a valuation and something interesting about them?
 
@@ -175,5 +175,5 @@ example (G: SeqUtilityGame I A X U)
 -- if maximizing v always leads to preferable trajectories.
 
 -- Note: this doesn't depend on the utility at x₀ itself?
-def valuation (G: SeqGame I A X) (p: I) (Vp: X → U) (upref: Relation U): Prop :=
+def valuation (G: SeqGame I A X) (p: I) (Vp: X → U) (upref: Rel U): Prop :=
   ∀ π0 π1 x₀, G.pref p (G.run π0 x₀) (G.run π1 x₀) ↔ upref (Vp (G.step π0 x₀)) (Vp (G.step π1 x₀))
